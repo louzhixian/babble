@@ -66,8 +66,8 @@ class VoiceInputController: ObservableObject {
             }
 
         case .longPressEnd:
-            // Push-to-talk end
-            if case .recording = state, !isToggleRecording {
+            // Push-to-talk end, or toggle mode stop (if user held key too long)
+            if case .recording = state {
                 stopAndProcess()
             }
         }
