@@ -9,6 +9,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var floatingPanel: FloatingPanelWindow?
     private let controller = VoiceInputController()
+    private let settingsStore = SettingsStore()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
@@ -50,6 +51,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(refineOptionsItem)
 
         menu.addItem(NSMenuItem.separator())
+
+        // Floating panel position submenu
+        let positionItem = NSMenuItem(title: "Panel Position", action: nil, keyEquivalent: "")
+        let positionMenu = NSMenu()
+        for position in FloatingPanelPosition.allCases {
+            let item = NSMenuItem(title: position.displayName, action: #selector(setPanelPosition(_:)), keyEquivalent: "")
+            item.representedObject = position
+            item.state = settingsStore.floatingPanelPosition == position ? .on : .off
+            positionMenu.addItem(item)
+        }
+        positionItem.submenu = positionMenu
+        menu.addItem(positionItem)
 
         menu.addItem(NSMenuItem(title: "Show Panel", action: #selector(showPanel), keyEquivalent: "p"))
         menu.addItem(NSMenuItem(title: "Hide Panel", action: #selector(hidePanel), keyEquivalent: "h"))
@@ -134,6 +147,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func hidePanel() {
         floatingPanel?.orderOut(nil)
+    }
+
+    @objc private func setPanelPosition(_ sender: NSMenuItem) {
+        guard let position = sender.representedObject as? FloatingPanelPosition else { return }
+        settingsStore.floatingPanelPosition = position
+        if let menu = sender.menu {
+            updatePanelPositionMenuState(menu)
+        }
+        floatingPanel?.updatePosition()
+    }
+
+    private func updatePanelPositionMenuState(_ menu: NSMenu) {
+        for item in menu.items {
+            guard let position = item.representedObject as? FloatingPanelPosition else { continue }
+            item.state = settingsStore.floatingPanelPosition == position ? .on : .off
+        }
     }
 
     @objc private func quit() {
