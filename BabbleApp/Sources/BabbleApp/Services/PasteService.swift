@@ -3,30 +3,57 @@
 import AppKit
 import Carbon.HIToolbox
 
-enum PasteError: Error, LocalizedError {
-    case accessibilityNotGranted
-    case pasteFailed
+protocol EventPoster {
+    func postPaste() -> Bool
+}
 
-    var errorDescription: String? {
-        switch self {
-        case .accessibilityNotGranted:
-            return "Accessibility permission is required to simulate paste"
-        case .pasteFailed:
-            return "Failed to simulate paste keystroke"
+struct SystemEventPoster: EventPoster {
+    func postPaste() -> Bool {
+        // Create Cmd+V key event
+        let source = CGEventSource(stateID: .hidSystemState)
+
+        // Key down
+        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true) else {
+            return false
         }
+        keyDown.flags = .maskCommand
+
+        // Key up
+        guard let keyUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false) else {
+            return false
+        }
+        keyUp.flags = .maskCommand
+
+        // Post events
+        keyDown.post(tap: .cghidEventTap)
+        keyUp.post(tap: .cghidEventTap)
+        return true
     }
 }
 
 struct PasteService {
-    /// Copy text to clipboard and simulate Cmd+V paste
-    static func pasteText(_ text: String) throws {
-        // Copy to clipboard
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+    private let eventPoster: EventPoster
 
-        // Simulate Cmd+V
-        try simulatePaste()
+    init(eventPoster: EventPoster = SystemEventPoster()) {
+        self.eventPoster = eventPoster
+    }
+
+    /// Copy text to clipboard and simulate Cmd+V paste
+    func pasteText(_ text: String) -> Bool {
+        Self.copyToClipboard(text)
+        return pasteFromClipboard()
+    }
+
+    /// Simulate Cmd+V paste from clipboard
+    func pasteFromClipboard() -> Bool {
+        // Check accessibility permission
+        // Using string literal to avoid concurrency issues with kAXTrustedCheckOptionPrompt
+        let options: [String: Bool] = ["AXTrustedCheckOptionPrompt": false]
+        guard AXIsProcessTrustedWithOptions(options as CFDictionary) else {
+            return false
+        }
+
+        return eventPoster.postPaste()
     }
 
     /// Copy text to clipboard only (no paste simulation)
@@ -34,34 +61,6 @@ struct PasteService {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
-    }
-
-    private static func simulatePaste() throws {
-        // Check accessibility permission
-        // Using string literal to avoid concurrency issues with kAXTrustedCheckOptionPrompt
-        let options: [String: Bool] = ["AXTrustedCheckOptionPrompt": false]
-        guard AXIsProcessTrustedWithOptions(options as CFDictionary) else {
-            throw PasteError.accessibilityNotGranted
-        }
-
-        // Create Cmd+V key event
-        let source = CGEventSource(stateID: .hidSystemState)
-
-        // Key down
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true) else {
-            throw PasteError.pasteFailed
-        }
-        keyDown.flags = .maskCommand
-
-        // Key up
-        guard let keyUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false) else {
-            throw PasteError.pasteFailed
-        }
-        keyUp.flags = .maskCommand
-
-        // Post events
-        keyDown.post(tap: .cghidEventTap)
-        keyUp.post(tap: .cghidEventTap)
     }
 
     /// Check if accessibility permission is granted

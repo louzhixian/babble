@@ -152,10 +152,17 @@ class VoiceInputController: ObservableObject {
             }
 
             // Paste
-            try PasteService.pasteText(finalText)
+            let pasteSucceeded = PasteService().pasteText(finalText)
 
             state = .completed(finalText)
-            panelState = FloatingPanelState(status: .idle, message: nil)
+            if pasteSucceeded {
+                panelState = FloatingPanelState(status: .idle, message: nil)
+            } else {
+                panelState = FloatingPanelState(
+                    status: .pasteFailed,
+                    message: "你可以在目标位置粘贴"
+                )
+            }
 
             // Reset after a short delay, but only if still in completed state
             // (user may have started a new recording during this window)
