@@ -155,8 +155,8 @@ whisper:
 After addressing review feedback, you need to re-trigger the review:
 
 1. **Commit the fixes** to the same branch
-2. **Add a comment** on the PR to request re-review (keep @codex on same line as text):
-   ```markdown
-   @codex **Changes since last review:** `<commit>`: <summary>
+2. **Add a comment** on the PR to request re-review:
+   ```
+   @codex please review the fix in new commit
    ```
 3. Wait for new review feedback and repeat if needed
