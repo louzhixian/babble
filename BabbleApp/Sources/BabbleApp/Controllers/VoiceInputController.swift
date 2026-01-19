@@ -16,7 +16,7 @@ enum VoiceInputState {
 class VoiceInputController: ObservableObject {
     @Published var state: VoiceInputState = .idle
     @Published var audioLevel: Float = 0
-    @Published var refineMode: RefineMode = .punctuate
+    @Published var refineOptions: Set<RefineOption> = [.punctuate]
     @Published var panelState = FloatingPanelState(status: .idle, message: nil)
 
     private let audioRecorder = AudioRecorder()
@@ -141,10 +141,10 @@ class VoiceInputController: ObservableObject {
 
             // Refine (with fallback to raw transcription if refinement fails)
             var finalText = result.text
-            if refineMode != .off {
+            if !refineOptions.isEmpty {
                 state = .refining
                 do {
-                    finalText = try await refineService.refine(text: result.text, mode: refineMode)
+                    finalText = try await refineService.refine(text: result.text, options: refineOptions)
                 } catch {
                     // Refinement failed (e.g., AFM not available), use raw transcription
                     print("Refinement failed, using raw transcription: \(error.localizedDescription)")

@@ -3,16 +3,13 @@
 import Foundation
 import FoundationModels
 
-enum RefineMode: String, CaseIterable {
-    case off = "关闭"
+enum RefineOption: String, CaseIterable, Hashable {
     case correct = "纠错"
     case punctuate = "标点"
     case polish = "润色"
 
-    var prompt: String? {
+    var prompt: String {
         switch self {
-        case .off:
-            return nil
         case .correct:
             return "修正以下语音转写中的明显错误，保持原意和口吻，只输出修正后的文本："
         case .punctuate:
@@ -20,6 +17,20 @@ enum RefineMode: String, CaseIterable {
         case .polish:
             return "将以下口语转写转为通顺的书面表达，保持原意，只输出修正后的文本："
         }
+    }
+}
+
+struct RefinePromptComposer {
+    private let orderedOptions: [RefineOption] = [.correct, .punctuate, .polish]
+
+    func prompt(for options: Set<RefineOption>) -> String? {
+        let prompts = orderedOptions.compactMap { option in
+            options.contains(option) ? option.prompt : nil
+        }
+        guard !prompts.isEmpty else {
+            return nil
+        }
+        return prompts.joined(separator: "\n")
     }
 }
 
@@ -39,10 +50,11 @@ enum RefineError: Error, LocalizedError {
 
 actor RefineService {
     private var session: LanguageModelSession?
+    private let promptComposer = RefinePromptComposer()
 
-    func refine(text: String, mode: RefineMode) async throws -> String {
-        // If mode is off, return original text
-        guard let prompt = mode.prompt else {
+    func refine(text: String, options: Set<RefineOption>) async throws -> String {
+        // If no options are selected, return original text
+        guard let prompt = promptComposer.prompt(for: options) else {
             return text
         }
 
