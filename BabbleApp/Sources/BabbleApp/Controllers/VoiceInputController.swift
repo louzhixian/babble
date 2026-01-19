@@ -138,9 +138,12 @@ class VoiceInputController: ObservableObject {
 
             state = .completed(finalText)
 
-            // Reset after a short delay
+            // Reset after a short delay, but only if still in completed state
+            // (user may have started a new recording during this window)
             try? await Task.sleep(nanoseconds: 1_500_000_000)
-            state = .idle
+            if case .completed = state {
+                state = .idle
+            }
 
         } catch {
             state = .error(error.localizedDescription)
