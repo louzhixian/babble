@@ -13,24 +13,36 @@ final class MainWindowRouter: ObservableObject {
 
 struct MainWindowView: View {
     @StateObject private var router = MainWindowRouter()
+    @ObservedObject var historyStore: HistoryStore
+    let settingsStore: SettingsStore
+
+    init(historyStore: HistoryStore = HistoryStore(limit: 100), settingsStore: SettingsStore = SettingsStore()) {
+        self.historyStore = historyStore
+        self.settingsStore = settingsStore
+    }
 
     var body: some View {
         NavigationSplitView {
             SidebarView(selection: $router.selection)
         } detail: {
-            Text(detailTitle)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            detailView
         }
     }
 
-    private var detailTitle: String {
+    @ViewBuilder
+    private var detailView: some View {
         switch router.selection {
         case .history:
-            return "History"
+            HistoryView(store: historyStore, settingsStore: settingsStore)
         case .compareEdit:
-            return "Compare/Edit"
+            if let record = historyStore.records.first {
+                CompareEditView(record: record)
+            } else {
+                Text("暂无记录")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         case .settings:
-            return "Settings"
+            SettingsView(store: settingsStore)
         }
     }
 }
