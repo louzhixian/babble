@@ -2,6 +2,7 @@
 
 import Foundation
 import SwiftUI
+import AppKit
 
 enum VoiceInputState {
     case idle
@@ -20,7 +21,7 @@ class VoiceInputController: NSObject, ObservableObject {
     @Published var panelState = FloatingPanelState(status: .idle, message: nil)
 
     private let audioRecorder = AudioRecorder()
-    private let whisperClient = WhisperClient()
+    private let frontmostAppNameProvider: () -> String?
     private let refineService = RefineService()
     private let hotkeyManager = HotkeyManager()
     private let processManager = WhisperProcessManager()
@@ -30,9 +31,14 @@ class VoiceInputController: NSObject, ObservableObject {
 
     private var isToggleRecording = false  // For toggle mode
 
-    init(historyStore: HistoryStore = HistoryStore(limit: 100), settingsStore: SettingsStore = SettingsStore()) {
+    init(
+        historyStore: HistoryStore = HistoryStore(limit: 100),
+        settingsStore: SettingsStore = SettingsStore(),
+        frontmostAppNameProvider: @escaping () -> String? = { NSWorkspace.shared.frontmostApplication?.localizedName }
+    ) {
         self.historyStore = historyStore
         self.settingsStore = settingsStore
+        self.frontmostAppNameProvider = frontmostAppNameProvider
         super.init()
         // Observe audio level from recorder
         audioRecorder.$audioLevel
@@ -75,6 +81,17 @@ class VoiceInputController: NSObject, ObservableObject {
 
     @objc private func handleHotzoneChange(_ notification: Notification) {
         applyHotzoneSettings()
+    }
+
+    func whisperRequestConfig() -> (port: Int, language: String?) {
+        let trimmedLanguage = settingsStore.defaultLanguage.trimmingCharacters(in: .whitespacesAndNewlines)
+        let language = trimmedLanguage.isEmpty ? nil : trimmedLanguage
+        return (port: settingsStore.whisperPort, language: language)
+    }
+
+    func targetAppNameForHistory() -> String? {
+        guard settingsStore.recordTargetApp else { return nil }
+        return frontmostAppNameProvider()
     }
 
     private func handleHotkeyEvent(_ event: HotkeyEvent) {
@@ -154,7 +171,11 @@ class VoiceInputController: NSObject, ObservableObject {
             try await processManager.ensureRunning()
 
             // Transcribe
-            let result = try await whisperClient.transcribe(audioURL: url)
+            let config = whisperRequestConfig()
+            let result = try await WhisperClient(port: config.port).transcribe(
+                audioURL: url,
+                language: config.language
+            )
 
             guard !result.text.isEmpty else {
                 state = .error("No speech detected")
@@ -191,7 +212,7 @@ class VoiceInputController: NSObject, ObservableObject {
                 rawText: result.text,
                 refinedText: finalText,
                 refineOptions: Array(options),
-                targetAppName: nil,
+                targetAppName: targetAppNameForHistory(),
                 editedText: nil
             )
             historyStore.append(record)
