@@ -1,5 +1,6 @@
 """FastAPI server for Whisper transcription service."""
 
+import os
 import tempfile
 from pathlib import Path
 
@@ -13,6 +14,13 @@ from transcribe import get_transcriber
 config_path = Path(__file__).parent / "config.yaml"
 with open(config_path) as f:
     config = yaml.safe_load(f)
+
+port_override = os.getenv("BABBLE_WHISPER_PORT")
+if port_override:
+    try:
+        config["server"]["port"] = int(port_override)
+    except ValueError:
+        pass
 
 app = FastAPI(title="Babble Whisper Service")
 

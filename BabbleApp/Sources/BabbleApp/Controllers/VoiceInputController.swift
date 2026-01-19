@@ -24,7 +24,7 @@ class VoiceInputController: NSObject, ObservableObject {
     private let frontmostAppNameProvider: () -> String?
     private let refineService = RefineService()
     private let hotkeyManager = HotkeyManager()
-    private let processManager = WhisperProcessManager()
+    private let processManager: WhisperProcessManager
     private let panelStateReducer = PanelStateReducer()
     private let historyStore: HistoryStore
     private let settingsStore: SettingsStore
@@ -39,6 +39,7 @@ class VoiceInputController: NSObject, ObservableObject {
         self.historyStore = historyStore
         self.settingsStore = settingsStore
         self.frontmostAppNameProvider = frontmostAppNameProvider
+        self.processManager = WhisperProcessManager(port: settingsStore.whisperPort)
         super.init()
         // Observe audio level from recorder
         audioRecorder.$audioLevel
@@ -47,6 +48,12 @@ class VoiceInputController: NSObject, ObservableObject {
             self,
             selector: #selector(handleHotzoneChange(_:)),
             name: .settingsHotzoneDidChange,
+            object: settingsStore
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWhisperPortChange(_:)),
+            name: .settingsWhisperPortDidChange,
             object: settingsStore
         )
     }
@@ -81,6 +88,13 @@ class VoiceInputController: NSObject, ObservableObject {
 
     @objc private func handleHotzoneChange(_ notification: Notification) {
         applyHotzoneSettings()
+    }
+
+    @objc private func handleWhisperPortChange(_ notification: Notification) {
+        let port = settingsStore.whisperPort
+        Task {
+            await processManager.updatePort(port)
+        }
     }
 
     func whisperRequestConfig() -> (port: Int, language: String?) {

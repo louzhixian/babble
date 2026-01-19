@@ -98,7 +98,10 @@ final class SettingsStore {
             let stored = defaults.integer(forKey: whisperPortKey)
             return stored > 0 ? stored : 8787
         }
-        set { defaults.set(newValue, forKey: whisperPortKey) }
+        set {
+            defaults.set(newValue, forKey: whisperPortKey)
+            NotificationCenter.default.post(name: .settingsWhisperPortDidChange, object: self)
+        }
     }
 
     var clearClipboardAfterCopy: Bool {
@@ -155,4 +158,5 @@ enum HotzoneCorner: String, CaseIterable {
 extension Notification.Name {
     static let settingsHistoryLimitDidChange = Notification.Name("SettingsStore.historyLimitDidChange")
     static let settingsHotzoneDidChange = Notification.Name("SettingsStore.hotzoneDidChange")
+    static let settingsWhisperPortDidChange = Notification.Name("SettingsStore.whisperPortDidChange")
 }
