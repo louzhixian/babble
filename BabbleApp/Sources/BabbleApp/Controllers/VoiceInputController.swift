@@ -13,7 +13,7 @@ enum VoiceInputState {
 }
 
 @MainActor
-class VoiceInputController: ObservableObject {
+class VoiceInputController: NSObject, ObservableObject {
     @Published var state: VoiceInputState = .idle
     @Published var audioLevel: Float = 0
     @Published var refineOptions: Set<RefineOption> = [.punctuate]
@@ -33,9 +33,16 @@ class VoiceInputController: ObservableObject {
     init(historyStore: HistoryStore = HistoryStore(limit: 100), settingsStore: SettingsStore = SettingsStore()) {
         self.historyStore = historyStore
         self.settingsStore = settingsStore
+        super.init()
         // Observe audio level from recorder
         audioRecorder.$audioLevel
             .assign(to: &$audioLevel)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleHotzoneChange(_:)),
+            name: .settingsHotzoneDidChange,
+            object: settingsStore
+        )
     }
 
     func start() {
@@ -44,11 +51,7 @@ class VoiceInputController: ObservableObject {
                 self?.handleHotkeyEvent(event)
             }
         }
-        hotkeyManager.configureHotzone(
-            enabled: settingsStore.hotzoneEnabled,
-            corner: settingsStore.hotzoneCorner,
-            holdSeconds: settingsStore.hotzoneHoldSeconds
-        )
+        applyHotzoneSettings()
     }
 
     func stop() {
@@ -56,6 +59,22 @@ class VoiceInputController: ObservableObject {
         Task {
             await processManager.stop()
         }
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    private func applyHotzoneSettings() {
+        hotkeyManager.configureHotzone(
+            enabled: settingsStore.hotzoneEnabled,
+            corner: settingsStore.hotzoneCorner,
+            holdSeconds: settingsStore.hotzoneHoldSeconds
+        )
+    }
+
+    @objc private func handleHotzoneChange(_ notification: Notification) {
+        applyHotzoneSettings()
     }
 
     private func handleHotkeyEvent(_ event: HotkeyEvent) {

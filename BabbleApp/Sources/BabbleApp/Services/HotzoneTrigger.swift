@@ -31,14 +31,22 @@ final class HotzoneTrigger {
 
     private let holdSeconds: TimeInterval
     private let detector: HotzoneDetector
-    private let onTrigger: () -> Void
+    private let onTriggerStart: () -> Void
+    private let onTriggerEnd: () -> Void
     private var timer: Timer?
     private var state: TriggerState = .idle
 
-    init(corner: HotzoneCorner, inset: CGFloat = 32, holdSeconds: TimeInterval, onTrigger: @escaping () -> Void) {
+    init(
+        corner: HotzoneCorner,
+        inset: CGFloat = 32,
+        holdSeconds: TimeInterval,
+        onTriggerStart: @escaping () -> Void,
+        onTriggerEnd: @escaping () -> Void
+    ) {
         self.detector = HotzoneDetector(corner: corner, inset: inset)
         self.holdSeconds = holdSeconds
-        self.onTrigger = onTrigger
+        self.onTriggerStart = onTriggerStart
+        self.onTriggerEnd = onTriggerEnd
     }
 
     func start() {
@@ -57,8 +65,14 @@ final class HotzoneTrigger {
     }
 
     private func tick() {
-        guard let screen = NSScreen.main?.frame,
-              let point = NSEvent.mouseLocation as CGPoint? else {
+        guard let point = NSEvent.mouseLocation as CGPoint? else {
+            state = .idle
+            return
+        }
+
+        let screen = NSScreen.screens.first { $0.frame.contains(point) }?.frame
+            ?? NSScreen.main?.frame
+        guard let screen else {
             state = .idle
             return
         }
@@ -76,11 +90,12 @@ final class HotzoneTrigger {
             }
             if Date().timeIntervalSince(start) >= holdSeconds {
                 state = .triggered
-                onTrigger()
+                onTriggerStart()
             }
         case .triggered:
             if !inside {
                 state = .idle
+                onTriggerEnd()
             }
         }
     }

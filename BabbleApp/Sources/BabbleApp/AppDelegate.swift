@@ -8,7 +8,7 @@ import SwiftUI
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var floatingPanel: FloatingPanelWindow?
-    private let coordinator = AppCoordinator()
+    let coordinator = AppCoordinator()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()

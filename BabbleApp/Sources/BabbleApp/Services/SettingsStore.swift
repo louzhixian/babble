@@ -40,6 +40,11 @@ final class SettingsStore {
         }
         set {
             defaults.set(newValue, forKey: historyLimitKey)
+            NotificationCenter.default.post(
+                name: .settingsHistoryLimitDidChange,
+                object: self,
+                userInfo: ["value": newValue]
+            )
         }
     }
 
@@ -108,7 +113,10 @@ final class SettingsStore {
 
     var hotzoneEnabled: Bool {
         get { defaults.object(forKey: hotzoneEnabledKey) as? Bool ?? false }
-        set { defaults.set(newValue, forKey: hotzoneEnabledKey) }
+        set {
+            defaults.set(newValue, forKey: hotzoneEnabledKey)
+            NotificationCenter.default.post(name: .settingsHotzoneDidChange, object: self)
+        }
     }
 
     var hotzoneCorner: HotzoneCorner {
@@ -121,15 +129,19 @@ final class SettingsStore {
         }
         set {
             defaults.set(newValue.rawValue, forKey: hotzoneCornerKey)
+            NotificationCenter.default.post(name: .settingsHotzoneDidChange, object: self)
         }
     }
 
     var hotzoneHoldSeconds: Double {
         get {
             let stored = defaults.double(forKey: hotzoneHoldSecondsKey)
-            return stored > 0 ? stored : 0.6
+            return stored > 0 ? stored : 2.0
         }
-        set { defaults.set(newValue, forKey: hotzoneHoldSecondsKey) }
+        set {
+            defaults.set(newValue, forKey: hotzoneHoldSecondsKey)
+            NotificationCenter.default.post(name: .settingsHotzoneDidChange, object: self)
+        }
     }
 }
 
@@ -138,4 +150,9 @@ enum HotzoneCorner: String, CaseIterable {
     case topRight
     case bottomLeft
     case bottomRight
+}
+
+extension Notification.Name {
+    static let settingsHistoryLimitDidChange = Notification.Name("SettingsStore.historyLimitDidChange")
+    static let settingsHotzoneDidChange = Notification.Name("SettingsStore.hotzoneDidChange")
 }

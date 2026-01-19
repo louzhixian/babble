@@ -84,11 +84,18 @@ class HotkeyManager: ObservableObject {
 
         guard enabled else { return }
 
-        hotzoneTrigger = HotzoneTrigger(corner: corner, holdSeconds: holdSeconds) { [weak self] in
-            guard let self, let handler = self.hotzoneHandler else { return }
-            handler(.longPressStart)
-            handler(.longPressEnd)
-        }
+        hotzoneTrigger = HotzoneTrigger(
+            corner: corner,
+            holdSeconds: holdSeconds,
+            onTriggerStart: { [weak self] in
+                guard let self, let handler = self.hotzoneHandler else { return }
+                handler(.longPressStart)
+            },
+            onTriggerEnd: { [weak self] in
+                guard let self, let handler = self.hotzoneHandler else { return }
+                handler(.longPressEnd)
+            }
+        )
         hotzoneTrigger?.start()
     }
 
