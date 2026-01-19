@@ -55,7 +55,8 @@ class FloatingPanelWindow: NSPanel {
     }
 
     private func updateFrame() {
-        guard let screen = NSScreen.main else { return }
+        let screen = ScreenSelection.frontmostScreen() ?? NSScreen.main
+        guard let screen else { return }
         let panelSize = contentView?.fittingSize ?? frame.size
         let targetFrame = layout.frame(
             for: settingsStore.floatingPanelPosition,
