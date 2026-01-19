@@ -8,6 +8,7 @@ struct HistoryRecord: Identifiable, Equatable {
     let refineOptions: [RefineOption]
     let targetAppName: String?
     var editedText: String?
+    var editedVariant: HistoryTextVariant?
 
     static func sample(id: String) -> HistoryRecord {
         HistoryRecord(
@@ -17,7 +18,8 @@ struct HistoryRecord: Identifiable, Equatable {
             refinedText: "refined",
             refineOptions: [],
             targetAppName: nil,
-            editedText: nil
+            editedText: nil,
+            editedVariant: nil
         )
     }
 }

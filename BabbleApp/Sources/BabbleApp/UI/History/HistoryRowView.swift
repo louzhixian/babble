@@ -21,9 +21,15 @@ final class HistoryRowViewModel: ObservableObject {
     var selectedText: String {
         switch selectedVariant {
         case .raw:
+            if record.editedVariant == .raw {
+                return record.editedText ?? record.rawText
+            }
             return record.rawText
         case .refined:
-            return record.editedText ?? record.refinedText
+            if record.editedVariant == .refined {
+                return record.editedText ?? record.refinedText
+            }
+            return record.refinedText
         }
     }
 
@@ -109,7 +115,11 @@ struct HistoryRowView: View {
         }
 
         if model.isEditing {
-            if let updated = historyStore.updateEditedText(for: model.record.id, editedText: model.editingText) {
+            if let updated = historyStore.updateEditedText(
+                for: model.record.id,
+                editedText: model.editingText,
+                editedVariant: model.selectedVariant
+            ) {
                 model.update(record: updated)
             }
             model.finishEditing()

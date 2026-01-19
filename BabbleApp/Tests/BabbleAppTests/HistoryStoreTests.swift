@@ -27,9 +27,10 @@ final class HistoryStoreTests: XCTestCase {
         let store = HistoryStore(limit: 2)
         store.append(HistoryRecord.sample(id: "1"))
 
-        let updated = store.updateEditedText(for: "1", editedText: "edited")
+        let updated = store.updateEditedText(for: "1", editedText: "edited", editedVariant: .raw)
 
         XCTAssertEqual(updated?.editedText, "edited")
+        XCTAssertEqual(updated?.editedVariant, .raw)
         XCTAssertEqual(store.records.first?.editedText, "edited")
     }
 }

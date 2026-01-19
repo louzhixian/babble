@@ -227,7 +227,8 @@ class VoiceInputController: NSObject, ObservableObject {
                 refinedText: finalText,
                 refineOptions: Array(options),
                 targetAppName: targetAppNameForHistory(),
-                editedText: nil
+                editedText: nil,
+                editedVariant: nil
             )
             historyStore.append(record)
 

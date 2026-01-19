@@ -19,12 +19,17 @@ final class HistoryStore: ObservableObject {
         trimToLimit()
     }
 
-    func updateEditedText(for recordID: String, editedText: String?) -> HistoryRecord? {
+    func updateEditedText(
+        for recordID: String,
+        editedText: String?,
+        editedVariant: HistoryTextVariant
+    ) -> HistoryRecord? {
         guard let index = records.firstIndex(where: { $0.id == recordID }) else {
             return nil
         }
         var record = records[index]
         record.editedText = editedText
+        record.editedVariant = editedVariant
         records[index] = record
         return record
     }
