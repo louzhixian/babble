@@ -27,6 +27,12 @@ actor WhisperProcessManager {
     }
 
     func start() async throws {
+        // If process crashed, reset state
+        if isRunning && !(process?.isRunning ?? false) {
+            isRunning = false
+            process = nil
+        }
+
         guard !isRunning else { return }
 
         let serverPath = whisperServicePath.appendingPathComponent("server.py")
@@ -60,7 +66,7 @@ actor WhisperProcessManager {
     }
 
     func ensureRunning() async throws {
-        if !isRunning {
+        if !running {
             try await start()
         }
     }

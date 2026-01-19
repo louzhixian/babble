@@ -16,6 +16,8 @@ class HotkeyManager: ObservableObject {
     private var eventMonitor: Any?
     private var keyDownTime: Date?
     private var isKeyDown = false
+    private var longPressTriggered = false
+    private var longPressTimer: Timer?
     private var handler: HotkeyHandler?
 
     // Long press threshold in seconds
@@ -54,35 +56,42 @@ class HotkeyManager: ObservableObject {
             guard event.modifierFlags.contains(hotkeyModifiers) else { return }
 
             isKeyDown = true
+            longPressTriggered = false
             keyDownTime = Date()
+
+            // Start timer to detect long press
+            longPressTimer?.invalidate()
+            longPressTimer = Timer.scheduledTimer(withTimeInterval: longPressThreshold, repeats: false) { [weak self] _ in
+                Task { @MainActor in
+                    self?.handleLongPressThreshold()
+                }
+            }
 
         case .keyUp:
             guard isKeyDown else { return }
             isKeyDown = false
+            longPressTimer?.invalidate()
+            longPressTimer = nil
 
-            guard let downTime = keyDownTime else { return }
-            let duration = Date().timeIntervalSince(downTime)
-            keyDownTime = nil
-
-            if duration < longPressThreshold {
-                // Short press - toggle mode
-                handler?(.shortPress)
-            } else {
+            if longPressTriggered {
                 // Long press released
                 handler?(.longPressEnd)
+            } else {
+                // Short press - toggle mode
+                handler?(.shortPress)
             }
+
+            keyDownTime = nil
+            longPressTriggered = false
 
         default:
             break
         }
+    }
 
-        // Check for long press start
-        if isKeyDown, let downTime = keyDownTime {
-            let duration = Date().timeIntervalSince(downTime)
-            if duration >= longPressThreshold {
-                handler?(.longPressStart)
-                keyDownTime = nil // Prevent multiple triggers
-            }
-        }
+    private func handleLongPressThreshold() {
+        guard isKeyDown else { return }
+        longPressTriggered = true
+        handler?(.longPressStart)
     }
 }
