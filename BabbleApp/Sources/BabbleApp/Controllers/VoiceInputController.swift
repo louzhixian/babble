@@ -22,6 +22,7 @@ class VoiceInputController: ObservableObject {
     private let whisperClient = WhisperClient()
     private let refineService = RefineService()
     private let hotkeyManager = HotkeyManager()
+    private let processManager = WhisperProcessManager()
 
     private var isToggleRecording = false  // For toggle mode
 
@@ -41,6 +42,9 @@ class VoiceInputController: ObservableObject {
 
     func stop() {
         hotkeyManager.unregister()
+        Task {
+            await processManager.stop()
+        }
     }
 
     private func handleHotkeyEvent(_ event: HotkeyEvent) {
@@ -93,6 +97,9 @@ class VoiceInputController: ObservableObject {
         state = .transcribing
 
         do {
+            // Ensure Whisper service is running
+            try await processManager.ensureRunning()
+
             // Transcribe
             let result = try await whisperClient.transcribe(audioURL: url)
 
