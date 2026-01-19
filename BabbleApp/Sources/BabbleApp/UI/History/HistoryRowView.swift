@@ -12,7 +12,7 @@ final class HistoryRowViewModel: ObservableObject {
     @Published var editingText = ""
     @Published var isEditing = false
 
-    let record: HistoryRecord
+    private(set) var record: HistoryRecord
 
     init(record: HistoryRecord) {
         self.record = record
@@ -23,7 +23,7 @@ final class HistoryRowViewModel: ObservableObject {
         case .raw:
             return record.rawText
         case .refined:
-            return record.refinedText
+            return record.editedText ?? record.refinedText
         }
     }
 
@@ -35,15 +35,23 @@ final class HistoryRowViewModel: ObservableObject {
     func finishEditing() {
         isEditing = false
     }
+
+    func update(record: HistoryRecord) {
+        self.record = record
+    }
 }
 
 struct HistoryRowView: View {
+    private let record: HistoryRecord
     @StateObject private var model: HistoryRowViewModel
     private let playSoundOnCopy: Bool
     private let clearClipboardAfterCopy: Bool
+    @ObservedObject private var historyStore: HistoryStore
 
-    init(record: HistoryRecord, playSoundOnCopy: Bool, clearClipboardAfterCopy: Bool) {
+    init(record: HistoryRecord, historyStore: HistoryStore, playSoundOnCopy: Bool, clearClipboardAfterCopy: Bool) {
+        self.record = record
         _model = StateObject(wrappedValue: HistoryRowViewModel(record: record))
+        _historyStore = ObservedObject(wrappedValue: historyStore)
         self.playSoundOnCopy = playSoundOnCopy
         self.clearClipboardAfterCopy = clearClipboardAfterCopy
     }
@@ -81,6 +89,9 @@ struct HistoryRowView: View {
             }
         }
         .padding(.vertical, 8)
+        .onChange(of: record.id) { _, _ in
+            model.update(record: record)
+        }
     }
 
     private func copyCurrentText() {
@@ -98,6 +109,9 @@ struct HistoryRowView: View {
         }
 
         if model.isEditing {
+            if let updated = historyStore.updateEditedText(for: model.record.id, editedText: model.editingText) {
+                model.update(record: updated)
+            }
             model.finishEditing()
         }
     }

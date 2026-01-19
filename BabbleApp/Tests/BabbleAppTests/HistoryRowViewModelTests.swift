@@ -18,4 +18,13 @@ final class HistoryRowViewModelTests: XCTestCase {
         model.finishEditing()
         XCTAssertFalse(model.isEditing)
     }
+
+    func testSelectedTextPrefersEditedTextForRefined() {
+        var record = HistoryRecord.sample(id: "1")
+        record.editedText = "edited text"
+        let model = HistoryRowViewModel(record: record)
+        model.selectedVariant = .refined
+
+        XCTAssertEqual(model.selectedText, "edited text")
+    }
 }

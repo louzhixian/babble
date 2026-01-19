@@ -22,4 +22,14 @@ final class HistoryStoreTests: XCTestCase {
 
         XCTAssertEqual(store.records.map { $0.id }, ["3", "2"])
     }
+
+    func testUpdatesEditedTextForRecord() {
+        let store = HistoryStore(limit: 2)
+        store.append(HistoryRecord.sample(id: "1"))
+
+        let updated = store.updateEditedText(for: "1", editedText: "edited")
+
+        XCTAssertEqual(updated?.editedText, "edited")
+        XCTAssertEqual(store.records.first?.editedText, "edited")
+    }
 }

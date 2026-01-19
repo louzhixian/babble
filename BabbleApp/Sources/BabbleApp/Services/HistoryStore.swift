@@ -19,6 +19,16 @@ final class HistoryStore: ObservableObject {
         trimToLimit()
     }
 
+    func updateEditedText(for recordID: String, editedText: String?) -> HistoryRecord? {
+        guard let index = records.firstIndex(where: { $0.id == recordID }) else {
+            return nil
+        }
+        var record = records[index]
+        record.editedText = editedText
+        records[index] = record
+        return record
+    }
+
     private func trimToLimit() {
         if records.count > limit {
             records = Array(records.prefix(limit))
