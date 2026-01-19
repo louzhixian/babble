@@ -1,0 +1,10 @@
+server:
+  host: "127.0.0.1"
+  port: 8787
+
+model:
+  name: "mlx-community/whisper-large-v3-turbo"
+  language: "zh"
+
+lifecycle:
+  idle_timeout_minutes: 5
