@@ -46,10 +46,9 @@ actor WhisperProcessManager {
         process.arguments = ["python3", serverPath.path]
         process.currentDirectoryURL = whisperServicePath
 
-        // Capture output for debugging
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
+        // Discard output to prevent pipe buffer from filling and blocking process
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
 
         try process.run()
         self.process = process
