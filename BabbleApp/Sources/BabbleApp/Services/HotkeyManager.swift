@@ -20,6 +20,8 @@ class HotkeyManager: ObservableObject {
     private var longPressTriggered = false
     private var longPressTimer: Timer?
     private var handler: HotkeyHandler?
+    private var hotzoneTrigger: HotzoneTrigger?
+    private var hotzoneHandler: HotkeyHandler?
 
     // Long press threshold in seconds
     private let longPressThreshold: TimeInterval = 0.3
@@ -33,6 +35,7 @@ class HotkeyManager: ObservableObject {
 
     func register(handler: @escaping HotkeyHandler) {
         self.handler = handler
+        self.hotzoneHandler = handler
         HotkeyManager.sharedInstance = self
 
         // Create event tap to intercept key events
@@ -60,6 +63,9 @@ class HotkeyManager: ObservableObject {
     }
 
     func unregister() {
+        hotzoneTrigger?.stop()
+        hotzoneTrigger = nil
+        hotzoneHandler = nil
         if let eventTap = eventTap {
             CGEvent.tapEnable(tap: eventTap, enable: false)
         }
@@ -70,6 +76,20 @@ class HotkeyManager: ObservableObject {
         runLoopSource = nil
         handler = nil
         HotkeyManager.sharedInstance = nil
+    }
+
+    func configureHotzone(enabled: Bool, corner: HotzoneCorner, holdSeconds: TimeInterval) {
+        hotzoneTrigger?.stop()
+        hotzoneTrigger = nil
+
+        guard enabled else { return }
+
+        hotzoneTrigger = HotzoneTrigger(corner: corner, holdSeconds: holdSeconds) { [weak self] in
+            guard let self, let handler = self.hotzoneHandler else { return }
+            handler(.longPressStart)
+            handler(.longPressEnd)
+        }
+        hotzoneTrigger?.start()
     }
 
     private static func handleEventTapCallback(
