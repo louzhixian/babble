@@ -1,10 +1,17 @@
 // BabbleApp/Sources/BabbleApp/UI/FloatingPanel/FloatingPanelWindow.swift
 
 import AppKit
+import Combine
 import SwiftUI
 
 class FloatingPanelWindow: NSPanel {
+    private let controller: VoiceInputController
+    private let layout = FloatingPanelLayout(margin: 20)
+    private let settingsStore = SettingsStore()
+    private var stateCancellable: AnyCancellable?
+
     init(controller: VoiceInputController) {
+        self.controller = controller
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 250, height: 60),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -17,17 +24,40 @@ class FloatingPanelWindow: NSPanel {
         backgroundColor = .clear
         hasShadow = false
 
-        // Position at top center of screen
-        if let screen = NSScreen.main {
-            let screenFrame = screen.visibleFrame
-            let x = screenFrame.midX - frame.width / 2
-            let y = screenFrame.maxY - frame.height - 50
-            setFrameOrigin(NSPoint(x: x, y: y))
-        }
+        let hostingView = NSHostingView(rootView: FloatingPanelView(controller: controller))
+        contentView = hostingView
 
-        contentView = NSHostingView(rootView: FloatingPanelView(controller: controller))
+        updateFrame()
+        apply(state: controller.panelState)
+
+        stateCancellable = controller.$panelState
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] state in
+                self?.apply(state: state)
+            }
     }
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+
+    private func apply(state: FloatingPanelState) {
+        switch state.status {
+        case .idle:
+            orderOut(nil)
+        case .recording, .processing, .pasteFailed, .error:
+            updateFrame()
+            orderFrontRegardless()
+        }
+    }
+
+    private func updateFrame() {
+        guard let screen = NSScreen.main else { return }
+        let panelSize = contentView?.fittingSize ?? frame.size
+        let targetFrame = layout.frame(
+            for: settingsStore.floatingPanelPosition,
+            panelSize: panelSize,
+            in: screen.visibleFrame
+        )
+        setFrame(targetFrame, display: true)
+    }
 }

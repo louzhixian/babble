@@ -17,6 +17,7 @@ class VoiceInputController: ObservableObject {
     @Published var state: VoiceInputState = .idle
     @Published var audioLevel: Float = 0
     @Published var refineMode: RefineMode = .punctuate
+    @Published var panelState = FloatingPanelState(status: .idle, message: nil)
 
     private let audioRecorder = AudioRecorder()
     private let whisperClient = WhisperClient()
@@ -77,13 +78,19 @@ class VoiceInputController: ObservableObject {
         do {
             try audioRecorder.startRecording()
             state = .recording
+            panelState = FloatingPanelState(status: .recording, message: nil)
         } catch {
             state = .error("Failed to start recording: \(error.localizedDescription)")
+            panelState = FloatingPanelState(
+                status: .error,
+                message: "Failed to start recording: \(error.localizedDescription)"
+            )
             // Auto-reset to idle after showing error, but only if still in error state
             Task {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 if case .error = state {
                     state = .idle
+                    panelState = FloatingPanelState(status: .idle, message: nil)
                 }
             }
         }
@@ -92,11 +99,13 @@ class VoiceInputController: ObservableObject {
     private func stopAndProcess() {
         guard let audioURL = audioRecorder.stopRecording() else {
             state = .error("No audio recorded")
+            panelState = FloatingPanelState(status: .error, message: "No audio recorded")
             // Auto-reset to idle after showing error, but only if still in error state
             Task {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 if case .error = state {
                     state = .idle
+                    panelState = FloatingPanelState(status: .idle, message: nil)
                 }
             }
             return
@@ -109,6 +118,7 @@ class VoiceInputController: ObservableObject {
 
     private func processAudio(at url: URL) async {
         state = .transcribing
+        panelState = FloatingPanelState(status: .processing, message: nil)
 
         do {
             // Ensure Whisper service is running
@@ -119,10 +129,12 @@ class VoiceInputController: ObservableObject {
 
             guard !result.text.isEmpty else {
                 state = .error("No speech detected")
+                panelState = FloatingPanelState(status: .error, message: "No speech detected")
                 // Auto-reset to idle after showing error, but only if still in error state
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 if case .error = state {
                     state = .idle
+                    panelState = FloatingPanelState(status: .idle, message: nil)
                 }
                 return
             }
@@ -143,6 +155,7 @@ class VoiceInputController: ObservableObject {
             try PasteService.pasteText(finalText)
 
             state = .completed(finalText)
+            panelState = FloatingPanelState(status: .idle, message: nil)
 
             // Reset after a short delay, but only if still in completed state
             // (user may have started a new recording during this window)
@@ -153,10 +166,12 @@ class VoiceInputController: ObservableObject {
 
         } catch {
             state = .error(error.localizedDescription)
+            panelState = FloatingPanelState(status: .error, message: error.localizedDescription)
             // Auto-reset to idle after showing error, but only if still in error state
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             if case .error = state {
                 state = .idle
+                panelState = FloatingPanelState(status: .idle, message: nil)
             }
         }
 

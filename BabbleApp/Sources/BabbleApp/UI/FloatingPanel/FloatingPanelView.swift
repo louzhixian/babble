@@ -1,5 +1,6 @@
 // BabbleApp/Sources/BabbleApp/UI/FloatingPanel/FloatingPanelView.swift
 
+import AppKit
 import SwiftUI
 
 struct FloatingPanelView: View {
@@ -16,7 +17,7 @@ struct FloatingPanelView: View {
                 Text(statusText)
                     .font(.headline)
 
-                if case .recording = controller.state {
+                if controller.panelState.status == .recording {
                     AudioLevelView(level: controller.audioLevel)
                         .frame(height: 4)
                 }
@@ -31,43 +32,38 @@ struct FloatingPanelView: View {
 
     private var statusIcon: some View {
         Group {
-            switch controller.state {
+            switch controller.panelState.status {
             case .idle:
                 Image(systemName: "mic")
                     .foregroundColor(.secondary)
             case .recording:
                 Image(systemName: "mic.fill")
-                    .foregroundColor(.red)
-            case .transcribing:
+                    .foregroundColor(Color(controller.panelState.micColor))
+            case .processing:
                 Image(systemName: "waveform")
                     .foregroundColor(.blue)
-            case .refining:
-                Image(systemName: "sparkles")
-                    .foregroundColor(.purple)
-            case .completed:
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
+            case .pasteFailed:
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(Color(controller.panelState.micColor))
             case .error:
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.orange)
+                    .foregroundColor(Color(controller.panelState.micColor))
             }
         }
     }
 
     private var statusText: String {
-        switch controller.state {
+        switch controller.panelState.status {
         case .idle:
             return "Ready"
         case .recording:
             return "Recording..."
-        case .transcribing:
-            return "Transcribing..."
-        case .refining:
-            return "Refining..."
-        case .completed(let text):
-            return String(text.prefix(30)) + (text.count > 30 ? "..." : "")
-        case .error(let message):
-            return message
+        case .processing:
+            return "Processing..."
+        case .pasteFailed:
+            return controller.panelState.message ?? "你可以在目标位置粘贴"
+        case .error:
+            return controller.panelState.message ?? "Something went wrong"
         }
     }
 }
