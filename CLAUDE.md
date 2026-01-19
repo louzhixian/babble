@@ -149,3 +149,18 @@ whisper:
    @codex
    ```
 6. Address review feedback, then merge
+
+### Re-requesting Review After Fixes
+
+After addressing review feedback, you need to re-trigger the review:
+
+1. **Commit the fixes** to the same branch
+2. **Add a comment** on the PR to request re-review:
+   ```markdown
+   @codex
+
+   **Changes since last review:**
+   - <commit hash 1>: <summary of fix>
+   - <commit hash 2>: <summary of fix>
+   ```
+3. Wait for new review feedback and repeat if needed
