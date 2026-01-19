@@ -24,7 +24,7 @@ class VoiceInputController: ObservableObject {
     private let refineService = RefineService()
     private let hotkeyManager = HotkeyManager()
     private let processManager = WhisperProcessManager()
-    private let panelAutoHidePolicy = PanelAutoHidePolicy()
+    private let panelStateReducer = PanelStateReducer()
 
     private var isToggleRecording = false  // For toggle mode
 
@@ -171,10 +171,10 @@ class VoiceInputController: ObservableObject {
             if case .completed = state {
                 state = .idle
             }
-            if panelAutoHidePolicy.shouldAutoHideAfterCompletion(pasteSucceeded: pasteSucceeded),
-               case .pasteFailed = panelState.status {
-                panelState = FloatingPanelState(status: .idle, message: nil)
-            }
+            panelState = panelStateReducer.finalPanelStateAfterDelay(
+                pasteSucceeded: pasteSucceeded,
+                current: panelState
+            )
 
         } catch {
             state = .error(error.localizedDescription)
