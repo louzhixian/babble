@@ -130,3 +130,22 @@ whisper:
 
 - **Microphone**: For audio recording
 - **Accessibility**: For simulating Cmd+V paste keystroke
+
+## PR Workflow
+
+1. **Make changes** and verify build passes (`swift build`)
+2. **Update related documentation** if the change affects:
+   - Architecture or data flow → update this CLAUDE.md
+   - Design decisions → update `docs/plans/` documents
+   - Configuration → update relevant config examples
+3. **Commit and push** to feature branch
+4. **Create PR** with:
+   - Summary of changes
+   - Test plan checklist
+5. **Add Review section** at the bottom of PR description:
+   ```markdown
+   ## Review
+
+   @codex
+   ```
+6. Address review feedback, then merge
