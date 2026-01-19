@@ -18,5 +18,7 @@
     <string>Babble needs microphone access to record your voice for speech-to-text transcription.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>Babble needs accessibility permission to paste text into other applications.</string>
+    <key>NSInputMonitoringUsageDescription</key>
+    <string>Babble needs input monitoring permission to detect the global hotkey (Option+Space) for voice input activation.</string>
 </dict>
 </plist>
