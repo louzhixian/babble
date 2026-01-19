@@ -121,14 +121,22 @@ class VoiceInputController: ObservableObject {
                 return
             }
 
-            // Refine
-            state = .refining
-            let refinedText = try await refineService.refine(text: result.text, mode: refineMode)
+            // Refine (with fallback to raw transcription if refinement fails)
+            var finalText = result.text
+            if refineMode != .off {
+                state = .refining
+                do {
+                    finalText = try await refineService.refine(text: result.text, mode: refineMode)
+                } catch {
+                    // Refinement failed (e.g., AFM not available), use raw transcription
+                    print("Refinement failed, using raw transcription: \(error.localizedDescription)")
+                }
+            }
 
             // Paste
-            try PasteService.pasteText(refinedText)
+            try PasteService.pasteText(finalText)
 
-            state = .completed(refinedText)
+            state = .completed(finalText)
 
             // Reset after a short delay
             try? await Task.sleep(nanoseconds: 1_500_000_000)
