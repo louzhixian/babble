@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import CoreGraphics
 
 @MainActor
@@ -17,6 +18,14 @@ final class ForceTouchTrigger {
     private var runLoopSource: CFRunLoopSource?
     private var holdTimer: Timer?
     private var state: TriggerState = .idle
+
+    // For filtering out three-finger drag by detecting mouse movement
+    private var initialMouseLocation: CGPoint?
+    private let movementThreshold: CGFloat = 2.0  // pixels - if mouse moves more than this, cancel
+
+    // Track if movement was ever detected during current touch cycle
+    // Once movement is detected, we won't trigger even if the finger stops moving
+    private var hadMovementDuringTouch = false
 
     // Static reference for C callback
     private nonisolated(unsafe) static var sharedInstance: ForceTouchTrigger?
@@ -37,10 +46,27 @@ final class ForceTouchTrigger {
         stop()
         ForceTouchTrigger.sharedInstance = self
 
-        // Only listen for pressure events (type 34) from Force Touch trackpad
-        // Do NOT listen for mouse events - they get triggered by three-finger drag
-        // and other gestures that simulate mouse input
-        let eventMask: CGEventMask = (1 << 34)  // NSEventTypePressure
+        // Check Accessibility permission
+        let trusted = AXIsProcessTrusted()
+        if !trusted {
+            // Prompt user to grant permission
+            let options: [String: Any] = ["AXTrustedCheckOptionPrompt": true]
+            AXIsProcessTrustedWithOptions(options as CFDictionary)
+            return
+        }
+
+        // Create event tap for all mouse events to capture pressure
+        // CGEventMaskBit for pressure events is not directly available,
+        // so we monitor mouse events and check pressure via NSEvent
+        let eventMask: CGEventMask =
+            (1 << CGEventType.leftMouseDown.rawValue) |
+            (1 << CGEventType.leftMouseUp.rawValue) |
+            (1 << CGEventType.leftMouseDragged.rawValue) |
+            (1 << CGEventType.otherMouseDown.rawValue) |
+            (1 << CGEventType.otherMouseUp.rawValue) |
+            (1 << CGEventType.otherMouseDragged.rawValue) |
+            // NSEventTypePressure = 34
+            (1 << 34)
 
         eventTap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -76,6 +102,8 @@ final class ForceTouchTrigger {
         eventTap = nil
         runLoopSource = nil
         ForceTouchTrigger.sharedInstance = nil
+        initialMouseLocation = nil
+        hadMovementDuringTouch = false
 
         if case .triggered = state {
             onTriggerEnd()
@@ -97,11 +125,14 @@ final class ForceTouchTrigger {
             return Unmanaged.passUnretained(event)
         }
 
+        // Get mouse location for movement detection
+        let mouseLocation = event.location
+
         // Convert to NSEvent to read pressure
         if let nsEvent = NSEvent(cgEvent: event) {
             let pressure = Double(nsEvent.pressure)
             Task { @MainActor in
-                sharedInstance?.handlePressure(pressure)
+                sharedInstance?.handlePressureWithLocation(pressure, location: mouseLocation)
             }
         }
 
@@ -109,13 +140,45 @@ final class ForceTouchTrigger {
         return Unmanaged.passUnretained(event)
     }
 
-    private func handlePressure(_ pressure: Double) {
+    private func handlePressureWithLocation(_ pressure: Double, location: CGPoint) {
         let isPressed = pressure >= pressureThreshold
+
+        // Check for mouse movement (to filter out three-finger drag)
+        // Once movement is detected, mark it - we won't trigger even if finger stops moving later
+        if let initial = initialMouseLocation {
+            let dx = abs(location.x - initial.x)
+            let dy = abs(location.y - initial.y)
+            if dx > movementThreshold || dy > movementThreshold {
+                hadMovementDuringTouch = true
+            }
+        }
+
+        // If movement was detected during this touch cycle, cancel any pending trigger
+        if hadMovementDuringTouch {
+            if case .pressing = state {
+                holdTimer?.invalidate()
+                holdTimer = nil
+                state = .idle
+            }
+            // Handle release even if movement occurred - must end triggered state
+            if !isPressed {
+                if case .triggered = state {
+                    state = .idle
+                    onTriggerEnd()
+                }
+                // Reset when finger is lifted
+                initialMouseLocation = nil
+                hadMovementDuringTouch = false
+            }
+            return
+        }
 
         switch state {
         case .idle:
             if isPressed {
                 state = .pressing
+                initialMouseLocation = location
+                hadMovementDuringTouch = false
                 startHoldTimer()
             }
 
@@ -125,11 +188,15 @@ final class ForceTouchTrigger {
                 holdTimer?.invalidate()
                 holdTimer = nil
                 state = .idle
+                initialMouseLocation = nil
+                hadMovementDuringTouch = false
             }
 
         case .triggered:
             if !isPressed {
                 state = .idle
+                initialMouseLocation = nil
+                hadMovementDuringTouch = false
                 onTriggerEnd()
             }
         }
