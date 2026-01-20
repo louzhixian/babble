@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import CoreGraphics
 
 @MainActor
@@ -41,7 +42,20 @@ final class ForceTouchTrigger {
         stop()
         ForceTouchTrigger.sharedInstance = self
 
-        print("ForceTouchTrigger: Starting (469fdc2 version)")
+        print("ForceTouchTrigger: Starting...")
+
+        // Check Accessibility permission
+        let trusted = AXIsProcessTrusted()
+        print("ForceTouchTrigger: Accessibility permission granted: \(trusted)")
+        if !trusted {
+            print("ForceTouchTrigger: WARNING - Accessibility permission NOT granted!")
+            print("ForceTouchTrigger: Please grant permission in System Settings > Privacy & Security > Accessibility")
+            // Prompt user to grant permission
+            // "AXTrustedCheckOptionPrompt" is the string value of kAXTrustedCheckOptionPrompt
+            let options: [String: Any] = ["AXTrustedCheckOptionPrompt": true]
+            AXIsProcessTrustedWithOptions(options as CFDictionary)
+            return
+        }
 
         // Create event tap for all mouse events to capture pressure
         // CGEventMaskBit for pressure events is not directly available,
