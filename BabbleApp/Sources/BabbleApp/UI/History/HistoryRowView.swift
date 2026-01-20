@@ -8,7 +8,12 @@ enum HistoryTextVariant: String, CaseIterable, Hashable {
 
 @MainActor
 final class HistoryRowViewModel: ObservableObject {
-    @Published var selectedVariant: HistoryTextVariant = .raw
+    @Published var selectedVariant: HistoryTextVariant = .raw {
+        didSet {
+            guard isEditing else { return }
+            editingText = selectedText
+        }
+    }
     @Published var editingText = ""
     @Published var isEditing = false
 
@@ -109,8 +114,18 @@ struct HistoryRowView: View {
         }
 
         if clearClipboardAfterCopy {
+            let pasteboard = NSPasteboard.general
+            let expectedChangeCount = pasteboard.changeCount
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                NSPasteboard.general.clearContents()
+                let currentText = pasteboard.string(forType: .string)
+                if ClipboardClearGuard.shouldClear(
+                    currentChangeCount: pasteboard.changeCount,
+                    currentText: currentText,
+                    expectedChangeCount: expectedChangeCount,
+                    expectedText: text
+                ) {
+                    pasteboard.clearContents()
+                }
             }
         }
 
@@ -124,5 +139,16 @@ struct HistoryRowView: View {
             }
             model.finishEditing()
         }
+    }
+}
+
+struct ClipboardClearGuard {
+    static func shouldClear(
+        currentChangeCount: Int,
+        currentText: String?,
+        expectedChangeCount: Int,
+        expectedText: String
+    ) -> Bool {
+        currentChangeCount == expectedChangeCount && currentText == expectedText
     }
 }

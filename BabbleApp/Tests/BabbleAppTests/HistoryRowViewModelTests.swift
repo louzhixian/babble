@@ -38,4 +38,37 @@ final class HistoryRowViewModelTests: XCTestCase {
 
         XCTAssertEqual(model.selectedText, record.refinedText)
     }
+
+    func testEditingTextUpdatesWhenVariantChangesDuringEdit() {
+        let record = HistoryRecord.sample(id: "1")
+        let model = HistoryRowViewModel(record: record)
+        model.beginEditing()
+        model.selectedVariant = .refined
+
+        XCTAssertEqual(model.editingText, record.refinedText)
+    }
+}
+
+final class ClipboardClearGuardTests: XCTestCase {
+    func testClearsWhenClipboardUnchanged() {
+        XCTAssertTrue(
+            ClipboardClearGuard.shouldClear(
+                currentChangeCount: 3,
+                currentText: "hello",
+                expectedChangeCount: 3,
+                expectedText: "hello"
+            )
+        )
+    }
+
+    func testDoesNotClearWhenClipboardChanges() {
+        XCTAssertFalse(
+            ClipboardClearGuard.shouldClear(
+                currentChangeCount: 4,
+                currentText: "other",
+                expectedChangeCount: 3,
+                expectedText: "hello"
+            )
+        )
+    }
 }
