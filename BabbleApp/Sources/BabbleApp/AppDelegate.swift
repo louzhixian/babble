@@ -5,9 +5,10 @@ import AVFoundation
 import SwiftUI
 
 @MainActor
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusItem: NSStatusItem?
     private var floatingPanel: FloatingPanelWindow?
+    private var mainWindow: NSWindow?
     let coordinator = AppCoordinator()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -131,7 +132,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let window = NSApp.windows.first(where: { !($0 is FloatingPanelWindow) }) {
             window.makeKeyAndOrderFront(nil)
         } else {
-            NSApp.sendAction(#selector(NSApplication.newWindowForTab(_:)), to: nil, from: nil)
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 1000, height: 720),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                backing: .buffered,
+                defer: false
+            )
+            window.title = "Babble"
+            window.contentViewController = NSHostingController(
+                rootView: MainWindowView(
+                    historyStore: coordinator.historyStore,
+                    settingsStore: coordinator.settingsStore,
+                    router: coordinator.mainWindowRouter
+                )
+            )
+            window.delegate = self
+            window.center()
+            window.makeKeyAndOrderFront(nil)
+            mainWindow = window
+        }
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        if window == mainWindow {
+            mainWindow = nil
         }
     }
 
