@@ -20,8 +20,6 @@ enum RefineError: Error, LocalizedError {
 actor RefineService {
     static let defaultPrompt = "将语音转写的口语文字整理为书面语。去除口语词（嗯、啊、就是、那个等）、删除重复内容、修复断句、添加标点。保持原意，只输出整理后的文字。"
 
-    private var session: LanguageModelSession?
-
     func refine(text: String, prompt: String) async throws -> String {
         // Check availability
         let availability = SystemLanguageModel.default.availability
@@ -29,14 +27,10 @@ actor RefineService {
             throw RefineError.modelNotAvailable
         }
 
-        // Create session if needed
-        if session == nil {
-            session = LanguageModelSession()
-        }
-
-        guard let session = session else {
-            throw RefineError.modelNotAvailable
-        }
+        // Create a fresh session for each request to avoid context accumulation
+        // LanguageModelSession accumulates conversation history, which would
+        // eventually exceed the context window limit
+        let session = LanguageModelSession()
 
         let fullPrompt = "\(prompt)\n\n\(text)"
 

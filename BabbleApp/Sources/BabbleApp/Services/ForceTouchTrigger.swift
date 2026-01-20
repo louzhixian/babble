@@ -37,18 +37,10 @@ final class ForceTouchTrigger {
         stop()
         ForceTouchTrigger.sharedInstance = self
 
-        // Create event tap for all mouse events to capture pressure
-        // CGEventMaskBit for pressure events is not directly available,
-        // so we monitor mouse events and check pressure via NSEvent
-        let eventMask: CGEventMask =
-            (1 << CGEventType.leftMouseDown.rawValue) |
-            (1 << CGEventType.leftMouseUp.rawValue) |
-            (1 << CGEventType.leftMouseDragged.rawValue) |
-            (1 << CGEventType.otherMouseDown.rawValue) |
-            (1 << CGEventType.otherMouseUp.rawValue) |
-            (1 << CGEventType.otherMouseDragged.rawValue) |
-            // NSEventTypePressure = 34
-            (1 << 34)
+        // Only listen for pressure events (type 34) from Force Touch trackpad
+        // Do NOT listen for mouse events - they get triggered by three-finger drag
+        // and other gestures that simulate mouse input
+        let eventMask: CGEventMask = (1 << 34)  // NSEventTypePressure
 
         eventTap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,

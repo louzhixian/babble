@@ -1,7 +1,9 @@
+import AppKit
 import SwiftUI
 
 struct SettingsView: View {
     @StateObject private var model: SettingsViewModel
+    @State private var showDiscardAlert = false
 
     init(store: SettingsStore) {
         _model = StateObject(wrappedValue: SettingsViewModel(store: store))
@@ -22,13 +24,38 @@ struct SettingsView: View {
 
             Section {
                 Toggle("启用润色", isOn: $model.refineEnabled)
-                TextEditor(text: $model.refinePrompt)
-                    .frame(minHeight: 80)
-                    .font(.body)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("自定义提示词")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    PromptTextView(
+                        text: Binding(
+                            get: { model.refinePromptDraft },
+                            set: { model.updateRefinePromptDraft($0) }
+                        ),
+                        placeholder: RefineService.defaultPrompt
+                    )
+                    .frame(minHeight: 100, maxHeight: 200)
+
+                    if model.refinePromptHasChanges {
+                        HStack {
+                            Spacer()
+                            Button("取消") {
+                                showDiscardAlert = true
+                            }
+                            Button("保存") {
+                                model.saveRefinePrompt()
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+                }
             } header: {
                 Text("润色")
             } footer: {
-                Text("默认提示词: \(RefineService.defaultPrompt)")
+                Text("留空则使用默认提示词")
                     .font(.caption)
             }
 
@@ -82,6 +109,14 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
+        .alert("放弃更改？", isPresented: $showDiscardAlert) {
+            Button("取消", role: .cancel) {}
+            Button("放弃", role: .destructive) {
+                model.discardRefinePromptChanges()
+            }
+        } message: {
+            Text("您对提示词的修改尚未保存，确定要放弃吗？")
+        }
     }
 
     private func cornerLabel(_ corner: HotzoneCorner) -> String {
@@ -94,6 +129,102 @@ struct SettingsView: View {
             return "左下"
         case .bottomRight:
             return "右下"
+        }
+    }
+}
+
+// NSTextView wrapper for proper keyboard input support
+struct PromptTextView: NSViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSTextView.scrollableTextView()
+        let textView = scrollView.documentView as! NSTextView
+
+        textView.delegate = context.coordinator
+        textView.isRichText = false
+        textView.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        textView.textColor = .textColor
+        textView.backgroundColor = .textBackgroundColor
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.allowsUndo = true
+
+        // Enable standard keyboard shortcuts
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.borderType = .bezelBorder
+
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        let textView = scrollView.documentView as! NSTextView
+
+        // Show placeholder when text is empty
+        if text.isEmpty {
+            // Only update if not already showing placeholder (avoid re-triggering)
+            if !context.coordinator.isShowingPlaceholder {
+                textView.string = placeholder
+                textView.textColor = .placeholderTextColor
+                context.coordinator.isShowingPlaceholder = true
+            }
+        } else {
+            // Hide placeholder and show actual text
+            if context.coordinator.isShowingPlaceholder {
+                textView.string = text
+                textView.textColor = .textColor
+                context.coordinator.isShowingPlaceholder = false
+            } else if textView.string != text {
+                // Update text only if it differs (avoid cursor jumping)
+                textView.string = text
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    @MainActor
+    class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: PromptTextView
+        var isShowingPlaceholder: Bool
+
+        init(_ parent: PromptTextView) {
+            self.parent = parent
+            self.isShowingPlaceholder = parent.text.isEmpty
+        }
+
+        func textDidBeginEditing(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+
+            // Clear placeholder on focus if showing
+            if isShowingPlaceholder {
+                textView.string = ""
+                textView.textColor = .textColor
+                isShowingPlaceholder = false
+            }
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            parent.text = textView.string
+        }
+
+        func textDidEndEditing(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+
+            // Show placeholder if empty
+            if textView.string.isEmpty {
+                textView.string = parent.placeholder
+                textView.textColor = .placeholderTextColor
+                isShowingPlaceholder = true
+            }
         }
     }
 }
