@@ -4,7 +4,7 @@ import AppKit
 final class ForceTouchTrigger {
     enum TriggerState {
         case idle
-        case pressing(Date)
+        case pressing
         case triggered
     }
 
@@ -14,6 +14,7 @@ final class ForceTouchTrigger {
     private let onTriggerEnd: () -> Void
     private var localMonitor: Any?
     private var globalMonitor: Any?
+    private var holdTimer: Timer?
     private var state: TriggerState = .idle
 
     init(
@@ -47,6 +48,9 @@ final class ForceTouchTrigger {
     }
 
     func stop() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+
         if let localMonitor {
             NSEvent.removeMonitor(localMonitor)
         }
@@ -69,18 +73,16 @@ final class ForceTouchTrigger {
         switch state {
         case .idle:
             if isPressed {
-                state = .pressing(Date())
+                state = .pressing
+                startHoldTimer()
             }
 
-        case .pressing(let start):
+        case .pressing:
             if !isPressed {
                 // Pressure released before threshold time
+                holdTimer?.invalidate()
+                holdTimer = nil
                 state = .idle
-                return
-            }
-            if Date().timeIntervalSince(start) >= holdSeconds {
-                state = .triggered
-                onTriggerStart()
             }
 
         case .triggered:
@@ -89,6 +91,21 @@ final class ForceTouchTrigger {
                 onTriggerEnd()
             }
         }
+    }
+
+    private func startHoldTimer() {
+        holdTimer?.invalidate()
+        holdTimer = Timer.scheduledTimer(withTimeInterval: holdSeconds, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleHoldTimerFired()
+            }
+        }
+    }
+
+    private func handleHoldTimerFired() {
+        guard case .pressing = state else { return }
+        state = .triggered
+        onTriggerStart()
     }
 
 #if DEBUG

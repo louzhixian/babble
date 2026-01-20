@@ -45,7 +45,7 @@ final class ForceTouchTriggerTests: XCTestCase {
             }
         )
 
-        trigger.setStateForTesting(.pressing(Date()))
+        trigger.setStateForTesting(.pressing)
         trigger.stop()
 
         XCTAssertFalse(didEnd)
