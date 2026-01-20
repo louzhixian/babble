@@ -17,7 +17,6 @@ class VoiceInputController: NSObject, ObservableObject {
     @Published var state: VoiceInputState = .idle
     @Published var audioLevel: Float = 0
     @Published var recordingDuration: TimeInterval = 0
-    @Published var refineOptions: Set<RefineOption> = [.punctuate]
     @Published var panelState = FloatingPanelState(status: .idle, message: nil)
 
     private let audioRecorder = AudioRecorder()
@@ -59,6 +58,12 @@ class VoiceInputController: NSObject, ObservableObject {
             name: .settingsWhisperPortDidChange,
             object: settingsStore
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleForceTouchChange(_:)),
+            name: .settingsForceTouchDidChange,
+            object: settingsStore
+        )
     }
 
     func start() {
@@ -68,6 +73,7 @@ class VoiceInputController: NSObject, ObservableObject {
             }
         }
         applyHotzoneSettings()
+        applyForceTouchSettings()
     }
 
     func stop() {
@@ -89,8 +95,19 @@ class VoiceInputController: NSObject, ObservableObject {
         )
     }
 
+    private func applyForceTouchSettings() {
+        hotkeyManager.configureForceTouch(
+            enabled: settingsStore.forceTouchEnabled,
+            holdSeconds: settingsStore.forceTouchHoldSeconds
+        )
+    }
+
     @objc private func handleHotzoneChange(_ notification: Notification) {
         applyHotzoneSettings()
+    }
+
+    @objc private func handleForceTouchChange(_ notification: Notification) {
+        applyForceTouchSettings()
     }
 
     @objc private func handleWhisperPortChange(_ notification: Notification) {
@@ -241,7 +258,7 @@ class VoiceInputController: NSObject, ObservableObject {
 
             // Refine (with fallback to raw transcription if refinement fails)
             var finalText = result.text
-            let options: Set<RefineOption> = settingsStore.autoRefine ? Set(settingsStore.defaultRefineOptions) : refineOptions
+            let options = Set(settingsStore.defaultRefineOptions)
             if !options.isEmpty {
                 state = .refining
                 do {

@@ -6,6 +6,7 @@ import Carbon.HIToolbox
 enum HotkeySource: Sendable {
     case keyboard
     case hotzone
+    case forceTouch
 }
 
 enum HotkeyEvent: Sendable {
@@ -27,6 +28,7 @@ class HotkeyManager: ObservableObject {
     private var longPressTimer: Timer?
     private var handler: HotkeyHandler?
     private var hotzoneTrigger: HotzoneTrigger?
+    private var forceTouchTrigger: ForceTouchTrigger?
     private var hotzoneHandler: HotkeyHandler?
 
     // Long press threshold in seconds
@@ -74,6 +76,8 @@ class HotkeyManager: ObservableObject {
     func unregister() {
         hotzoneTrigger?.stop()
         hotzoneTrigger = nil
+        forceTouchTrigger?.stop()
+        forceTouchTrigger = nil
         hotzoneHandler = nil
         if let eventTap = eventTap {
             CGEvent.tapEnable(tap: eventTap, enable: false)
@@ -106,6 +110,26 @@ class HotkeyManager: ObservableObject {
             }
         )
         hotzoneTrigger?.start()
+    }
+
+    func configureForceTouch(enabled: Bool, holdSeconds: TimeInterval) {
+        forceTouchTrigger?.stop()
+        forceTouchTrigger = nil
+
+        guard enabled else { return }
+
+        forceTouchTrigger = ForceTouchTrigger(
+            holdSeconds: holdSeconds,
+            onTriggerStart: { [weak self] in
+                guard let self, let handler = self.hotzoneHandler else { return }
+                handler(.longPressStart(.forceTouch))
+            },
+            onTriggerEnd: { [weak self] in
+                guard let self, let handler = self.hotzoneHandler else { return }
+                handler(.longPressEnd(.forceTouch))
+            }
+        )
+        forceTouchTrigger?.start()
     }
 
     private static func handleEventTapCallback(

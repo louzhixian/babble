@@ -6,7 +6,6 @@ final class SettingsStore: ObservableObject {
     private let defaults: UserDefaults
     private let positionKey = "floatingPanelPosition"
     private let historyLimitKey = "historyLimit"
-    private let autoRefineKey = "autoRefine"
     private let defaultRefineOptionsKey = "defaultRefineOptions"
     private let customPromptsKey = "customPrompts"
     private let defaultLanguageKey = "defaultLanguage"
@@ -15,6 +14,8 @@ final class SettingsStore: ObservableObject {
     private let hotzoneEnabledKey = "hotzoneEnabled"
     private let hotzoneCornerKey = "hotzoneCorner"
     private let hotzoneHoldSecondsKey = "hotzoneHoldSeconds"
+    private let forceTouchEnabledKey = "forceTouchEnabled"
+    private let forceTouchHoldSecondsKey = "forceTouchHoldSeconds"
 
     init(userDefaults: UserDefaults = .standard) {
         self.defaults = userDefaults
@@ -46,11 +47,6 @@ final class SettingsStore: ObservableObject {
                 userInfo: ["value": newValue]
             )
         }
-    }
-
-    var autoRefine: Bool {
-        get { defaults.object(forKey: autoRefineKey) as? Bool ?? false }
-        set { defaults.set(newValue, forKey: autoRefineKey) }
     }
 
     var defaultRefineOptions: [RefineOption] {
@@ -139,6 +135,25 @@ final class SettingsStore: ObservableObject {
             NotificationCenter.default.post(name: .settingsHotzoneDidChange, object: self)
         }
     }
+
+    var forceTouchEnabled: Bool {
+        get { defaults.object(forKey: forceTouchEnabledKey) as? Bool ?? false }
+        set {
+            defaults.set(newValue, forKey: forceTouchEnabledKey)
+            NotificationCenter.default.post(name: .settingsForceTouchDidChange, object: self)
+        }
+    }
+
+    var forceTouchHoldSeconds: Double {
+        get {
+            let stored = defaults.double(forKey: forceTouchHoldSecondsKey)
+            return stored > 0 ? stored : 2.0
+        }
+        set {
+            defaults.set(newValue, forKey: forceTouchHoldSecondsKey)
+            NotificationCenter.default.post(name: .settingsForceTouchDidChange, object: self)
+        }
+    }
 }
 
 enum HotzoneCorner: String, CaseIterable, Sendable {
@@ -151,5 +166,6 @@ enum HotzoneCorner: String, CaseIterable, Sendable {
 extension Notification.Name {
     static let settingsHistoryLimitDidChange = Notification.Name("SettingsStore.historyLimitDidChange")
     static let settingsHotzoneDidChange = Notification.Name("SettingsStore.hotzoneDidChange")
+    static let settingsForceTouchDidChange = Notification.Name("SettingsStore.forceTouchDidChange")
     static let settingsWhisperPortDidChange = Notification.Name("SettingsStore.whisperPortDidChange")
 }

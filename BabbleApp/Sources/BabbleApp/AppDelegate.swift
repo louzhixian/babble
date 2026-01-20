@@ -85,7 +85,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func setRefineOff(_ sender: NSMenuItem) {
-        coordinator.voiceInputController.refineOptions = []
+        coordinator.settingsStore.defaultRefineOptions = []
         if let menu = sender.menu {
             updateRefineMenuState(menu)
         }
@@ -93,11 +93,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc private func toggleRefineOption(_ sender: NSMenuItem) {
         guard let option = sender.representedObject as? RefineOption else { return }
-        if coordinator.voiceInputController.refineOptions.contains(option) {
-            coordinator.voiceInputController.refineOptions.remove(option)
+        var options = coordinator.settingsStore.defaultRefineOptions
+        if options.contains(option) {
+            options.removeAll { $0 == option }
         } else {
-            coordinator.voiceInputController.refineOptions.insert(option)
+            options.append(option)
         }
+        coordinator.settingsStore.defaultRefineOptions = options
 
         if let menu = sender.menu {
             updateRefineMenuState(menu)
@@ -105,11 +107,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func updateRefineMenuState(_ menu: NSMenu) {
+        let options = coordinator.settingsStore.defaultRefineOptions
         for item in menu.items {
             if let option = item.representedObject as? RefineOption {
-                item.state = coordinator.voiceInputController.refineOptions.contains(option) ? .on : .off
+                item.state = options.contains(option) ? .on : .off
             } else if let token = item.representedObject as? String, token == "off" {
-                item.state = coordinator.voiceInputController.refineOptions.isEmpty ? .on : .off
+                item.state = options.isEmpty ? .on : .off
             }
         }
     }

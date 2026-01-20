@@ -6,10 +6,6 @@ final class SettingsViewModel: ObservableObject {
         didSet { store.historyLimit = historyLimit }
     }
 
-    @Published var autoRefine: Bool {
-        didSet { store.autoRefine = autoRefine }
-    }
-
     @Published var defaultRefineOptions: [RefineOption] {
         didSet { store.defaultRefineOptions = defaultRefineOptions }
     }
@@ -42,12 +38,19 @@ final class SettingsViewModel: ObservableObject {
         didSet { store.hotzoneHoldSeconds = hotzoneHoldSeconds }
     }
 
+    @Published var forceTouchEnabled: Bool {
+        didSet { store.forceTouchEnabled = forceTouchEnabled }
+    }
+
+    @Published var forceTouchHoldSeconds: Double {
+        didSet { store.forceTouchHoldSeconds = forceTouchHoldSeconds }
+    }
+
     private let store: SettingsStore
 
     init(store: SettingsStore) {
         self.store = store
         historyLimit = store.historyLimit
-        autoRefine = store.autoRefine
         defaultRefineOptions = store.defaultRefineOptions
         customPrompts = store.customPrompts
         defaultLanguage = store.defaultLanguage
@@ -56,5 +59,7 @@ final class SettingsViewModel: ObservableObject {
         hotzoneEnabled = store.hotzoneEnabled
         hotzoneCorner = store.hotzoneCorner
         hotzoneHoldSeconds = store.hotzoneHoldSeconds
+        forceTouchEnabled = store.forceTouchEnabled
+        forceTouchHoldSeconds = store.forceTouchHoldSeconds
     }
 }

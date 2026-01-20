@@ -21,20 +21,18 @@ struct SettingsView: View {
             }
 
             Section("润色") {
-                Toggle("自动润色", isOn: $model.autoRefine)
+                ForEach(RefineOption.allCases, id: \.self) { option in
+                    Toggle(option.rawValue, isOn: bindingForOption(option))
+                }
             }
 
             ForEach(RefineOption.allCases, id: \.self) { option in
                 Section {
-                    Toggle("启用", isOn: bindingForOption(option))
-                    TextField(
-                        "自定义提示词",
-                        text: bindingForPrompt(option),
-                        prompt: Text(option.prompt).foregroundStyle(.tertiary)
-                    )
-                    .textFieldStyle(.roundedBorder)
+                    TextEditor(text: bindingForPrompt(option))
+                        .frame(minHeight: 60)
+                        .font(.body)
                 } header: {
-                    Text(option.rawValue)
+                    Text("\(option.rawValue) 提示词")
                 } footer: {
                     Text("默认: \(option.prompt)")
                         .font(.caption)
@@ -42,11 +40,12 @@ struct SettingsView: View {
             }
 
             if !model.defaultRefineOptions.isEmpty {
-                Section("提示词预览") {
+                Section("完整提示词预览") {
                     Text(combinedPromptPreview)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
 
@@ -79,6 +78,23 @@ struct SettingsView: View {
                 Text("热区触发")
             } footer: {
                 Text("将鼠标移动到屏幕角落并停留指定时间即可触发录音")
+            }
+
+            Section {
+                Toggle("启用 Force Touch", isOn: $model.forceTouchEnabled)
+                Slider(value: $model.forceTouchHoldSeconds, in: 0.5...3.0, step: 0.1) {
+                    Text("触发停留秒数")
+                }
+                HStack {
+                    Text("停留秒数")
+                    Spacer()
+                    Text(String(format: "%.1f", model.forceTouchHoldSeconds))
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Force Touch 触发")
+            } footer: {
+                Text("在触控板上用力按压并保持指定时间即可触发录音，松开后开始转写")
             }
         }
         .formStyle(.grouped)

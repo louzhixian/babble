@@ -49,4 +49,39 @@ final class SettingsStoreExpandedTests: XCTestCase {
         let store2 = SettingsStore(userDefaults: defaults)
         XCTAssertEqual(store2.customPrompts[.correct], "Custom correct prompt")
     }
+
+    func testPersistsForceTouchEnabled() {
+        let defaults = UserDefaults(suiteName: "SettingsStoreExpandedTests")!
+        defaults.removePersistentDomain(forName: "SettingsStoreExpandedTests")
+        let store = SettingsStore(userDefaults: defaults)
+
+        XCTAssertFalse(store.forceTouchEnabled)
+        store.forceTouchEnabled = true
+        XCTAssertTrue(store.forceTouchEnabled)
+
+        // Verify persistence
+        let store2 = SettingsStore(userDefaults: defaults)
+        XCTAssertTrue(store2.forceTouchEnabled)
+    }
+
+    func testDefaultsForceTouchHoldSecondsToTwoSeconds() {
+        let defaults = UserDefaults(suiteName: "SettingsStoreExpandedTests")!
+        defaults.removePersistentDomain(forName: "SettingsStoreExpandedTests")
+        let store = SettingsStore(userDefaults: defaults)
+
+        XCTAssertEqual(store.forceTouchHoldSeconds, 2.0, accuracy: 0.001)
+    }
+
+    func testPersistsForceTouchHoldSeconds() {
+        let defaults = UserDefaults(suiteName: "SettingsStoreExpandedTests")!
+        defaults.removePersistentDomain(forName: "SettingsStoreExpandedTests")
+        let store = SettingsStore(userDefaults: defaults)
+
+        store.forceTouchHoldSeconds = 1.5
+        XCTAssertEqual(store.forceTouchHoldSeconds, 1.5, accuracy: 0.001)
+
+        // Verify persistence
+        let store2 = SettingsStore(userDefaults: defaults)
+        XCTAssertEqual(store2.forceTouchHoldSeconds, 1.5, accuracy: 0.001)
+    }
 }
