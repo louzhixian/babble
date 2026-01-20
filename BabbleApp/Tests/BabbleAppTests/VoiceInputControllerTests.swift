@@ -76,7 +76,7 @@ final class VoiceInputControllerTests: XCTestCase {
         XCTFail("Expected toggle recording to remain active after longPressEnd.")
     }
 
-    func testHotzoneLongPressEndStopsNonToggleRecording() {
+    func testHotzoneLongPressEndStopsHotzoneRecording() {
         let defaults = UserDefaults(suiteName: "VoiceInputControllerTests")!
         defaults.removePersistentDomain(forName: "VoiceInputControllerTests")
         let settingsStore = SettingsStore(userDefaults: defaults)
@@ -88,6 +88,7 @@ final class VoiceInputControllerTests: XCTestCase {
         )
         controller.state = .recording
         controller.setToggleRecordingForTesting(false)
+        controller.setActiveLongPressSourceForTesting(.hotzone)
 
         controller.handleHotkeyEventForTesting(.longPressEnd(.hotzone))
 
@@ -114,5 +115,27 @@ final class VoiceInputControllerTests: XCTestCase {
         if case .recording = controller.state {
             XCTFail("Expected toggle recording to stop after keyboard longPressEnd.")
         }
+    }
+
+    func testHotzoneLongPressEndDoesNotStopKeyboardRecording() {
+        let defaults = UserDefaults(suiteName: "VoiceInputControllerTests")!
+        defaults.removePersistentDomain(forName: "VoiceInputControllerTests")
+        let settingsStore = SettingsStore(userDefaults: defaults)
+
+        let controller = VoiceInputController(
+            historyStore: HistoryStore(limit: 10),
+            settingsStore: settingsStore,
+            frontmostAppNameProvider: { nil }
+        )
+        controller.state = .recording
+        controller.setToggleRecordingForTesting(false)
+        controller.setActiveLongPressSourceForTesting(.keyboard)
+
+        controller.handleHotkeyEventForTesting(.longPressEnd(.hotzone))
+
+        if case .recording = controller.state {
+            return
+        }
+        XCTFail("Expected keyboard recording to remain active after hotzone longPressEnd.")
     }
 }

@@ -30,6 +30,7 @@ class VoiceInputController: NSObject, ObservableObject {
     private let settingsStore: SettingsStore
 
     private var isToggleRecording = false  // For toggle mode
+    private var activeLongPressSource: HotkeySource?
 
     init(
         historyStore: HistoryStore = HistoryStore(limit: 100),
@@ -116,6 +117,10 @@ class VoiceInputController: NSObject, ObservableObject {
     func setToggleRecordingForTesting(_ value: Bool) {
         isToggleRecording = value
     }
+
+    func setActiveLongPressSourceForTesting(_ value: HotkeySource?) {
+        activeLongPressSource = value
+    }
 #endif
 
     private func handleHotkeyEvent(_ event: HotkeyEvent) {
@@ -127,19 +132,27 @@ class VoiceInputController: NSObject, ObservableObject {
             } else if case .idle = state {
                 startRecording()
                 isToggleRecording = true
+                activeLongPressSource = nil
             }
 
-        case .longPressStart(_):
+        case .longPressStart(let source):
             // Push-to-talk start
             if case .idle = state {
                 startRecording()
                 isToggleRecording = false
+                activeLongPressSource = source
             }
 
         case .longPressEnd(let source):
             // Push-to-talk end, or toggle mode stop (if user held key too long)
-            if case .recording = state, source == .keyboard || !isToggleRecording {
-                stopAndProcess()
+            if case .recording = state {
+                if isToggleRecording {
+                    if source == .keyboard {
+                        stopAndProcess()
+                    }
+                } else if activeLongPressSource == source {
+                    stopAndProcess()
+                }
             }
         }
     }
@@ -168,6 +181,7 @@ class VoiceInputController: NSObject, ObservableObject {
 
     private func stopAndProcess() {
         guard let audioURL = audioRecorder.stopRecording() else {
+            activeLongPressSource = nil
             state = .error("No audio recorded")
             panelState = FloatingPanelState(status: .error, message: "No audio recorded")
             // Auto-reset to idle after showing error, but only if still in error state
@@ -181,6 +195,7 @@ class VoiceInputController: NSObject, ObservableObject {
             return
         }
 
+        activeLongPressSource = nil
         Task {
             await processAudio(at: audioURL)
         }
