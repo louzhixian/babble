@@ -16,7 +16,7 @@ struct BabbleApp: App {
         }
 
         Settings {
-            EmptyView()
+            SettingsView(store: appDelegate.coordinator.settingsStore)
         }
     }
 }
