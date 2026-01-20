@@ -78,7 +78,7 @@ struct AudioLevelView: View {
                     .fill(Color.gray.opacity(0.3))
 
                 RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.red)
+                    .fill(Color(AudioLevelStyle.barColor))
                     .frame(width: geometry.size.width * CGFloat(level))
             }
         }

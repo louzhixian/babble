@@ -3,10 +3,15 @@
 import AppKit
 import Carbon.HIToolbox
 
+enum HotkeySource {
+    case keyboard
+    case hotzone
+}
+
 enum HotkeyEvent {
     case shortPress    // Toggle mode: tap to start/stop
-    case longPressStart  // Push-to-talk: held down
-    case longPressEnd    // Push-to-talk: released
+    case longPressStart(HotkeySource)  // Push-to-talk: held down
+    case longPressEnd(HotkeySource)    // Push-to-talk: released
 }
 
 @MainActor
@@ -20,6 +25,8 @@ class HotkeyManager: ObservableObject {
     private var longPressTriggered = false
     private var longPressTimer: Timer?
     private var handler: HotkeyHandler?
+    private var hotzoneTrigger: HotzoneTrigger?
+    private var hotzoneHandler: HotkeyHandler?
 
     // Long press threshold in seconds
     private let longPressThreshold: TimeInterval = 0.3
@@ -33,6 +40,7 @@ class HotkeyManager: ObservableObject {
 
     func register(handler: @escaping HotkeyHandler) {
         self.handler = handler
+        self.hotzoneHandler = handler
         HotkeyManager.sharedInstance = self
 
         // Create event tap to intercept key events
@@ -60,6 +68,9 @@ class HotkeyManager: ObservableObject {
     }
 
     func unregister() {
+        hotzoneTrigger?.stop()
+        hotzoneTrigger = nil
+        hotzoneHandler = nil
         if let eventTap = eventTap {
             CGEvent.tapEnable(tap: eventTap, enable: false)
         }
@@ -70,6 +81,27 @@ class HotkeyManager: ObservableObject {
         runLoopSource = nil
         handler = nil
         HotkeyManager.sharedInstance = nil
+    }
+
+    func configureHotzone(enabled: Bool, corner: HotzoneCorner, holdSeconds: TimeInterval) {
+        hotzoneTrigger?.stop()
+        hotzoneTrigger = nil
+
+        guard enabled else { return }
+
+        hotzoneTrigger = HotzoneTrigger(
+            corner: corner,
+            holdSeconds: holdSeconds,
+            onTriggerStart: { [weak self] in
+                guard let self, let handler = self.hotzoneHandler else { return }
+                handler(.longPressStart(.hotzone))
+            },
+            onTriggerEnd: { [weak self] in
+                guard let self, let handler = self.hotzoneHandler else { return }
+                handler(.longPressEnd(.hotzone))
+            }
+        )
+        hotzoneTrigger?.start()
     }
 
     private static func handleEventTapCallback(
@@ -142,7 +174,7 @@ class HotkeyManager: ObservableObject {
 
             if longPressTriggered {
                 // Long press released
-                handler?(.longPressEnd)
+                handler?(.longPressEnd(.keyboard))
             } else {
                 // Short press - toggle mode
                 handler?(.shortPress)
@@ -159,6 +191,6 @@ class HotkeyManager: ObservableObject {
     private func handleLongPressThreshold() {
         guard isKeyDown else { return }
         longPressTriggered = true
-        handler?(.longPressStart)
+        handler?(.longPressStart(.keyboard))
     }
 }

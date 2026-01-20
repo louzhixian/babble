@@ -22,10 +22,16 @@ enum RefineOption: String, CaseIterable, Hashable {
 
 struct RefinePromptComposer {
     private let orderedOptions: [RefineOption] = [.correct, .punctuate, .polish]
+    private let customPrompts: [RefineOption: String]
+
+    init(customPrompts: [RefineOption: String] = [:]) {
+        self.customPrompts = customPrompts
+    }
 
     func prompt(for options: Set<RefineOption>) -> String? {
-        let prompts = orderedOptions.compactMap { option in
-            options.contains(option) ? option.prompt : nil
+        let prompts: [String] = orderedOptions.compactMap { option in
+            guard options.contains(option) else { return nil }
+            return customPrompts[option] ?? option.prompt
         }
         guard !prompts.isEmpty else {
             return nil
@@ -50,9 +56,10 @@ enum RefineError: Error, LocalizedError {
 
 actor RefineService {
     private var session: LanguageModelSession?
-    private let promptComposer = RefinePromptComposer()
+    private var promptComposer = RefinePromptComposer()
 
-    func refine(text: String, options: Set<RefineOption>) async throws -> String {
+    func refine(text: String, options: Set<RefineOption>, customPrompts: [RefineOption: String] = [:]) async throws -> String {
+        promptComposer = RefinePromptComposer(customPrompts: customPrompts)
         // If no options are selected, return original text
         guard let prompt = promptComposer.prompt(for: options) else {
             return text

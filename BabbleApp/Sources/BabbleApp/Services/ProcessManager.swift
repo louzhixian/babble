@@ -8,20 +8,24 @@ actor WhisperProcessManager {
 
     private let whisperServicePath: URL
     private let pythonPath: URL
-    private let healthURL: URL
+    private var healthURL: URL
+    private var host: String
+    private var port: Int
     private let session: URLSession
 
     // Readiness check configuration
     private let maxStartupWaitSeconds = 60
     private let healthCheckIntervalNanoseconds: UInt64 = 500_000_000  // 0.5 seconds
 
-    init() {
+    init(host: String = "127.0.0.1", port: Int = 8787) {
         // Locate whisper-service relative to app bundle or development path
         let bundle = Bundle.main
         let fileManager = FileManager.default
 
         // Set up health check URL and session (common to both paths)
-        healthURL = URL(string: "http://127.0.0.1:8787/health")!
+        self.host = host
+        self.port = port
+        healthURL = URL(string: "http://\(host):\(port)/health")!
         session = URLSession.shared
 
         // Try bundle resources first (for packaged .app)
@@ -57,6 +61,21 @@ actor WhisperProcessManager {
         }
     }
 
+    func updatePort(_ port: Int) {
+        guard self.port != port else { return }
+        stop()
+        self.port = port
+        healthURL = URL(string: "http://\(host):\(port)/health")!
+    }
+
+    func currentPort() -> Int {
+        port
+    }
+
+    func currentHealthURL() -> URL {
+        healthURL
+    }
+
     func start() async throws {
         // If process crashed, reset state
         if isRunning && !(process?.isRunning ?? false) {
@@ -82,6 +101,9 @@ actor WhisperProcessManager {
         process.executableURL = pythonPath
         process.arguments = [serverPath.path]
         process.currentDirectoryURL = whisperServicePath
+        var environment = ProcessInfo.processInfo.environment
+        environment["BABBLE_WHISPER_PORT"] = String(port)
+        process.environment = environment
 
         // Discard output to prevent pipe buffer from filling and blocking process
         process.standardOutput = FileHandle.nullDevice

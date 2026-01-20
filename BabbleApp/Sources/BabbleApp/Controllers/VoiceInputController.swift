@@ -2,6 +2,7 @@
 
 import Foundation
 import SwiftUI
+import AppKit
 
 enum VoiceInputState {
     case idle
@@ -13,25 +14,49 @@ enum VoiceInputState {
 }
 
 @MainActor
-class VoiceInputController: ObservableObject {
+class VoiceInputController: NSObject, ObservableObject {
     @Published var state: VoiceInputState = .idle
     @Published var audioLevel: Float = 0
     @Published var refineOptions: Set<RefineOption> = [.punctuate]
     @Published var panelState = FloatingPanelState(status: .idle, message: nil)
 
     private let audioRecorder = AudioRecorder()
-    private let whisperClient = WhisperClient()
+    private let frontmostAppNameProvider: () -> String?
     private let refineService = RefineService()
     private let hotkeyManager = HotkeyManager()
-    private let processManager = WhisperProcessManager()
+    private let processManager: WhisperProcessManager
     private let panelStateReducer = PanelStateReducer()
+    private let historyStore: HistoryStore
+    private let settingsStore: SettingsStore
 
     private var isToggleRecording = false  // For toggle mode
+    private var activeLongPressSource: HotkeySource?
 
-    init() {
+    init(
+        historyStore: HistoryStore = HistoryStore(limit: 100),
+        settingsStore: SettingsStore = SettingsStore(),
+        frontmostAppNameProvider: @escaping () -> String? = { NSWorkspace.shared.frontmostApplication?.localizedName }
+    ) {
+        self.historyStore = historyStore
+        self.settingsStore = settingsStore
+        self.frontmostAppNameProvider = frontmostAppNameProvider
+        self.processManager = WhisperProcessManager(port: settingsStore.whisperPort)
+        super.init()
         // Observe audio level from recorder
         audioRecorder.$audioLevel
             .assign(to: &$audioLevel)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleHotzoneChange(_:)),
+            name: .settingsHotzoneDidChange,
+            object: settingsStore
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWhisperPortChange(_:)),
+            name: .settingsWhisperPortDidChange,
+            object: settingsStore
+        )
     }
 
     func start() {
@@ -40,6 +65,7 @@ class VoiceInputController: ObservableObject {
                 self?.handleHotkeyEvent(event)
             }
         }
+        applyHotzoneSettings()
     }
 
     func stop() {
@@ -48,6 +74,54 @@ class VoiceInputController: ObservableObject {
             await processManager.stop()
         }
     }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    private func applyHotzoneSettings() {
+        hotkeyManager.configureHotzone(
+            enabled: settingsStore.hotzoneEnabled,
+            corner: settingsStore.hotzoneCorner,
+            holdSeconds: settingsStore.hotzoneHoldSeconds
+        )
+    }
+
+    @objc private func handleHotzoneChange(_ notification: Notification) {
+        applyHotzoneSettings()
+    }
+
+    @objc private func handleWhisperPortChange(_ notification: Notification) {
+        let port = settingsStore.whisperPort
+        Task {
+            await processManager.updatePort(port)
+        }
+    }
+
+    func whisperRequestConfig() -> (port: Int, language: String?) {
+        let trimmedLanguage = settingsStore.defaultLanguage.trimmingCharacters(in: .whitespacesAndNewlines)
+        let language = trimmedLanguage.isEmpty ? nil : trimmedLanguage
+        return (port: settingsStore.whisperPort, language: language)
+    }
+
+    func targetAppNameForHistory() -> String? {
+        guard settingsStore.recordTargetApp else { return nil }
+        return frontmostAppNameProvider()
+    }
+
+#if DEBUG
+    func handleHotkeyEventForTesting(_ event: HotkeyEvent) {
+        handleHotkeyEvent(event)
+    }
+
+    func setToggleRecordingForTesting(_ value: Bool) {
+        isToggleRecording = value
+    }
+
+    func setActiveLongPressSourceForTesting(_ value: HotkeySource?) {
+        activeLongPressSource = value
+    }
+#endif
 
     private func handleHotkeyEvent(_ event: HotkeyEvent) {
         switch event {
@@ -58,19 +132,27 @@ class VoiceInputController: ObservableObject {
             } else if case .idle = state {
                 startRecording()
                 isToggleRecording = true
+                activeLongPressSource = nil
             }
 
-        case .longPressStart:
+        case .longPressStart(let source):
             // Push-to-talk start
             if case .idle = state {
                 startRecording()
                 isToggleRecording = false
+                activeLongPressSource = source
             }
 
-        case .longPressEnd:
+        case .longPressEnd(let source):
             // Push-to-talk end, or toggle mode stop (if user held key too long)
             if case .recording = state {
-                stopAndProcess()
+                if isToggleRecording {
+                    if source == .keyboard {
+                        stopAndProcess()
+                    }
+                } else if activeLongPressSource == source {
+                    stopAndProcess()
+                }
             }
         }
     }
@@ -99,6 +181,7 @@ class VoiceInputController: ObservableObject {
 
     private func stopAndProcess() {
         guard let audioURL = audioRecorder.stopRecording() else {
+            activeLongPressSource = nil
             state = .error("No audio recorded")
             panelState = FloatingPanelState(status: .error, message: "No audio recorded")
             // Auto-reset to idle after showing error, but only if still in error state
@@ -112,6 +195,7 @@ class VoiceInputController: ObservableObject {
             return
         }
 
+        activeLongPressSource = nil
         Task {
             await processAudio(at: audioURL)
         }
@@ -126,7 +210,11 @@ class VoiceInputController: ObservableObject {
             try await processManager.ensureRunning()
 
             // Transcribe
-            let result = try await whisperClient.transcribe(audioURL: url)
+            let config = whisperRequestConfig()
+            let result = try await WhisperClient(port: config.port).transcribe(
+                audioURL: url,
+                language: config.language
+            )
 
             guard !result.text.isEmpty else {
                 state = .error("No speech detected")
@@ -142,15 +230,32 @@ class VoiceInputController: ObservableObject {
 
             // Refine (with fallback to raw transcription if refinement fails)
             var finalText = result.text
-            if !refineOptions.isEmpty {
+            let options: Set<RefineOption> = settingsStore.autoRefine ? Set(settingsStore.defaultRefineOptions) : refineOptions
+            if !options.isEmpty {
                 state = .refining
                 do {
-                    finalText = try await refineService.refine(text: result.text, options: refineOptions)
+                    finalText = try await refineService.refine(
+                        text: result.text,
+                        options: options,
+                        customPrompts: settingsStore.customPrompts
+                    )
                 } catch {
                     // Refinement failed (e.g., AFM not available), use raw transcription
                     print("Refinement failed, using raw transcription: \(error.localizedDescription)")
                 }
             }
+
+            let record = HistoryRecord(
+                id: UUID().uuidString,
+                timestamp: Date(),
+                rawText: result.text,
+                refinedText: finalText,
+                refineOptions: Array(options),
+                targetAppName: targetAppNameForHistory(),
+                editedText: nil,
+                editedVariant: nil
+            )
+            historyStore.append(record)
 
             // Paste
             let pasteSucceeded = PasteService().pasteText(finalText)
