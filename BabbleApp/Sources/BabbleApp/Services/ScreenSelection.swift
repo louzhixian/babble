@@ -28,6 +28,7 @@ struct ScreenSelection {
             return nil
         }
 
+        // CGWindowListCopyWindowInfo uses screen coordinates (origin at top-left of main screen)
         let windowBounds = CGRect(
             x: boundsDict["X"] ?? 0,
             y: boundsDict["Y"] ?? 0,
@@ -35,11 +36,26 @@ struct ScreenSelection {
             height: boundsDict["Height"] ?? 0
         )
 
-        let screenFrames = NSScreen.screens.map { $0.visibleFrame }
-        guard let targetFrame = screenFrameContaining(rect: windowBounds, screens: screenFrames) else {
-            return nil
-        }
+        // Find the screen that contains the window center using screen coordinates
+        let windowCenter = CGPoint(x: windowBounds.midX, y: windowBounds.midY)
 
-        return NSScreen.screens.first { $0.visibleFrame.equalTo(targetFrame) }
+        // NSScreen.frame uses Cocoa coordinates (origin at bottom-left of main screen)
+        // We need to convert or compare in the same coordinate system
+        // Use NSScreen.frame (not visibleFrame) and convert to screen coordinates
+        guard let mainScreen = NSScreen.screens.first else { return nil }
+        let mainScreenHeight = mainScreen.frame.height
+
+        return NSScreen.screens.first { screen in
+            // Convert NSScreen frame to screen coordinates (flip Y)
+            let screenFrame = screen.frame
+            let screenTop = mainScreenHeight - screenFrame.maxY
+            let screenRect = CGRect(
+                x: screenFrame.minX,
+                y: screenTop,
+                width: screenFrame.width,
+                height: screenFrame.height
+            )
+            return screenRect.contains(windowCenter)
+        }
     }
 }
