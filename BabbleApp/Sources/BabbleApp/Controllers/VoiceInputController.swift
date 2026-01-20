@@ -233,9 +233,12 @@ class VoiceInputController: NSObject, ObservableObject {
         state = .transcribing
         panelState = FloatingPanelState(status: .processing, message: nil)
 
-        // Validate audio before sending to Whisper
+        // Validate audio in background to avoid blocking main thread
+        // AudioValidator scans all samples which can be slow for long recordings
         let validator = AudioValidator()
-        let validationResult = await validator.validate(audioURL: url)
+        let validationResult = await Task.detached {
+            await validator.validate(audioURL: url)
+        }.value
 
         switch validationResult {
         case .tooShort(let duration):
