@@ -20,33 +20,16 @@ struct SettingsView: View {
                 }
             }
 
-            Section("润色") {
-                ForEach(RefineOption.allCases, id: \.self) { option in
-                    Toggle(option.rawValue, isOn: bindingForOption(option))
-                }
-            }
-
-            ForEach(RefineOption.allCases, id: \.self) { option in
-                Section {
-                    TextEditor(text: bindingForPrompt(option))
-                        .frame(minHeight: 60)
-                        .font(.body)
-                } header: {
-                    Text("\(option.rawValue) 提示词")
-                } footer: {
-                    Text("默认: \(option.prompt)")
-                        .font(.caption)
-                }
-            }
-
-            if !model.defaultRefineOptions.isEmpty {
-                Section("完整提示词预览") {
-                    Text(combinedPromptPreview)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+            Section {
+                Toggle("启用润色", isOn: $model.refineEnabled)
+                TextEditor(text: $model.refinePrompt)
+                    .frame(minHeight: 80)
+                    .font(.body)
+            } header: {
+                Text("润色")
+            } footer: {
+                Text("默认提示词: \(RefineService.defaultPrompt)")
+                    .font(.caption)
             }
 
             Section("识别") {
@@ -101,36 +84,6 @@ struct SettingsView: View {
         .padding()
     }
 
-    private func bindingForOption(_ option: RefineOption) -> Binding<Bool> {
-        Binding(
-            get: { model.defaultRefineOptions.contains(option) },
-            set: { isOn in
-                if isOn {
-                    if !model.defaultRefineOptions.contains(option) {
-                        model.defaultRefineOptions.append(option)
-                    }
-                } else {
-                    model.defaultRefineOptions.removeAll { $0 == option }
-                }
-            }
-        )
-    }
-
-    private func bindingForPrompt(_ option: RefineOption) -> Binding<String> {
-        Binding(
-            get: { model.customPrompts[option] ?? "" },
-            set: { newValue in
-                var next = model.customPrompts
-                if newValue.isEmpty {
-                    next.removeValue(forKey: option)
-                } else {
-                    next[option] = newValue
-                }
-                model.customPrompts = next
-            }
-        )
-    }
-
     private func cornerLabel(_ corner: HotzoneCorner) -> String {
         switch corner {
         case .topLeft:
@@ -142,15 +95,5 @@ struct SettingsView: View {
         case .bottomRight:
             return "右下"
         }
-    }
-
-    private var combinedPromptPreview: String {
-        let orderedOptions: [RefineOption] = [.correct, .punctuate, .polish]
-        let enabledOptions = Set(model.defaultRefineOptions)
-        let prompts: [String] = orderedOptions.compactMap { option in
-            guard enabledOptions.contains(option) else { return nil }
-            return model.customPrompts[option] ?? option.prompt
-        }
-        return prompts.joined(separator: "\n")
     }
 }

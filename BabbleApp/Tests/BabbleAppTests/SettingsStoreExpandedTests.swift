@@ -37,17 +37,49 @@ final class SettingsStoreExpandedTests: XCTestCase {
         wait(for: [clearClipboardExpectation], timeout: 1.0)
     }
 
-    func testPersistsCustomPrompts() {
+    func testPersistsRefineEnabled() {
         let defaults = UserDefaults(suiteName: "SettingsStoreExpandedTests")!
         defaults.removePersistentDomain(forName: "SettingsStoreExpandedTests")
         let store = SettingsStore(userDefaults: defaults)
 
-        store.customPrompts = [.correct: "Custom correct prompt"]
-        XCTAssertEqual(store.customPrompts[.correct], "Custom correct prompt")
+        // Default is true
+        XCTAssertTrue(store.refineEnabled)
+
+        store.refineEnabled = false
+        XCTAssertFalse(store.refineEnabled)
 
         // Verify it persists by creating a new store with same defaults
         let store2 = SettingsStore(userDefaults: defaults)
-        XCTAssertEqual(store2.customPrompts[.correct], "Custom correct prompt")
+        XCTAssertFalse(store2.refineEnabled)
+    }
+
+    func testPersistsRefinePrompt() {
+        let defaults = UserDefaults(suiteName: "SettingsStoreExpandedTests")!
+        defaults.removePersistentDomain(forName: "SettingsStoreExpandedTests")
+        let store = SettingsStore(userDefaults: defaults)
+
+        // Default is empty string
+        XCTAssertEqual(store.refinePrompt, "")
+
+        store.refinePrompt = "Custom prompt"
+        XCTAssertEqual(store.refinePrompt, "Custom prompt")
+
+        // Verify it persists by creating a new store with same defaults
+        let store2 = SettingsStore(userDefaults: defaults)
+        XCTAssertEqual(store2.refinePrompt, "Custom prompt")
+    }
+
+    func testEffectiveRefinePromptUsesDefaultWhenEmpty() {
+        let defaults = UserDefaults(suiteName: "SettingsStoreExpandedTests")!
+        defaults.removePersistentDomain(forName: "SettingsStoreExpandedTests")
+        let store = SettingsStore(userDefaults: defaults)
+
+        // When refinePrompt is empty, effectiveRefinePrompt should return default
+        XCTAssertEqual(store.effectiveRefinePrompt, RefineService.defaultPrompt)
+
+        // When custom prompt is set, effectiveRefinePrompt should return it
+        store.refinePrompt = "Custom prompt"
+        XCTAssertEqual(store.effectiveRefinePrompt, "Custom prompt")
     }
 
     func testPersistsForceTouchEnabled() {

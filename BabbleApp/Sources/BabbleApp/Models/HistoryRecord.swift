@@ -5,7 +5,7 @@ struct HistoryRecord: Identifiable, Equatable {
     let timestamp: Date
     let rawText: String
     let refinedText: String
-    let refineOptions: [RefineOption]
+    let refined: Bool
     let targetAppName: String?
     var editedText: String?
     var editedVariant: HistoryTextVariant?
@@ -16,7 +16,7 @@ struct HistoryRecord: Identifiable, Equatable {
             timestamp: Date(),
             rawText: "raw",
             refinedText: "refined",
-            refineOptions: [],
+            refined: false,
             targetAppName: nil,
             editedText: nil,
             editedVariant: nil

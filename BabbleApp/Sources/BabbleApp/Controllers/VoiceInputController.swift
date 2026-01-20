@@ -258,14 +258,13 @@ class VoiceInputController: NSObject, ObservableObject {
 
             // Refine (with fallback to raw transcription if refinement fails)
             var finalText = result.text
-            let options = Set(settingsStore.defaultRefineOptions)
-            if !options.isEmpty {
+            let refined = settingsStore.refineEnabled
+            if refined {
                 state = .refining
                 do {
                     finalText = try await refineService.refine(
                         text: result.text,
-                        options: options,
-                        customPrompts: settingsStore.customPrompts
+                        prompt: settingsStore.effectiveRefinePrompt
                     )
                 } catch {
                     // Refinement failed (e.g., AFM not available), use raw transcription
@@ -278,7 +277,7 @@ class VoiceInputController: NSObject, ObservableObject {
                 timestamp: Date(),
                 rawText: result.text,
                 refinedText: finalText,
-                refineOptions: Array(options),
+                refined: refined,
                 targetAppName: targetAppNameForHistory(),
                 editedText: nil,
                 editedVariant: nil

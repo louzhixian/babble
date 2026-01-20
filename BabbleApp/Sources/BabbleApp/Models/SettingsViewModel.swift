@@ -6,12 +6,12 @@ final class SettingsViewModel: ObservableObject {
         didSet { store.historyLimit = historyLimit }
     }
 
-    @Published var defaultRefineOptions: [RefineOption] {
-        didSet { store.defaultRefineOptions = defaultRefineOptions }
+    @Published var refineEnabled: Bool {
+        didSet { store.refineEnabled = refineEnabled }
     }
 
-    @Published var customPrompts: [RefineOption: String] {
-        didSet { store.customPrompts = customPrompts }
+    @Published var refinePrompt: String {
+        didSet { store.refinePrompt = refinePrompt }
     }
 
     @Published var defaultLanguage: String {
@@ -51,8 +51,8 @@ final class SettingsViewModel: ObservableObject {
     init(store: SettingsStore) {
         self.store = store
         historyLimit = store.historyLimit
-        defaultRefineOptions = store.defaultRefineOptions
-        customPrompts = store.customPrompts
+        refineEnabled = store.refineEnabled
+        refinePrompt = store.refinePrompt
         defaultLanguage = store.defaultLanguage
         whisperPort = store.whisperPort
         clearClipboardAfterCopy = store.clearClipboardAfterCopy

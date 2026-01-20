@@ -32,8 +32,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let actions = MenuActions(
             target: self,
             showMainWindow: #selector(showMainWindow),
-            setRefineOff: #selector(setRefineOff(_:)),
-            toggleRefineOption: #selector(toggleRefineOption(_:)),
             setPanelPosition: #selector(setPanelPosition(_:)),
             quit: #selector(quit)
         )
@@ -84,39 +82,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
-    @objc private func setRefineOff(_ sender: NSMenuItem) {
-        coordinator.settingsStore.defaultRefineOptions = []
-        if let menu = sender.menu {
-            updateRefineMenuState(menu)
-        }
-    }
-
-    @objc private func toggleRefineOption(_ sender: NSMenuItem) {
-        guard let option = sender.representedObject as? RefineOption else { return }
-        var options = coordinator.settingsStore.defaultRefineOptions
-        if options.contains(option) {
-            options.removeAll { $0 == option }
-        } else {
-            options.append(option)
-        }
-        coordinator.settingsStore.defaultRefineOptions = options
-
-        if let menu = sender.menu {
-            updateRefineMenuState(menu)
-        }
-    }
-
-    private func updateRefineMenuState(_ menu: NSMenu) {
-        let options = coordinator.settingsStore.defaultRefineOptions
-        for item in menu.items {
-            if let option = item.representedObject as? RefineOption {
-                item.state = options.contains(option) ? .on : .off
-            } else if let token = item.representedObject as? String, token == "off" {
-                item.state = options.isEmpty ? .on : .off
-            }
-        }
-    }
-
     @objc private func setPanelPosition(_ sender: NSMenuItem) {
         guard let position = sender.representedObject as? FloatingPanelPosition else { return }
         coordinator.settingsStore.floatingPanelPosition = position
@@ -156,10 +121,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.contentViewController = hostingController
             window.isReleasedWhenClosed = false  // Keep window alive when closed
             window.center()
+            window.delegate = self
             mainWindow = window
         }
 
+        // Set floating level to ensure window appears on top
+        mainWindow?.level = .floating
         mainWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    // MARK: - NSWindowDelegate
+
+    func windowDidResignKey(_ notification: Notification) {
+        // When window loses focus, reset to normal level so it doesn't always float
+        if let window = notification.object as? NSWindow, window === mainWindow {
+            window.level = .normal
+        }
     }
 
     @objc private func quit() {

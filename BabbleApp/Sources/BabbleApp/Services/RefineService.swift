@@ -3,43 +3,6 @@
 import Foundation
 import FoundationModels
 
-enum RefineOption: String, CaseIterable, Hashable {
-    case correct = "纠错"
-    case punctuate = "标点"
-    case polish = "润色"
-
-    var prompt: String {
-        switch self {
-        case .correct:
-            return "修正以下语音转写中的明显错误，保持原意和口吻，只输出修正后的文本："
-        case .punctuate:
-            return "修正以下语音转写中的错误并优化标点符号，保持原意，只输出修正后的文本："
-        case .polish:
-            return "将以下口语转写转为通顺的书面表达，保持原意，只输出修正后的文本："
-        }
-    }
-}
-
-struct RefinePromptComposer {
-    private let orderedOptions: [RefineOption] = [.correct, .punctuate, .polish]
-    private let customPrompts: [RefineOption: String]
-
-    init(customPrompts: [RefineOption: String] = [:]) {
-        self.customPrompts = customPrompts
-    }
-
-    func prompt(for options: Set<RefineOption>) -> String? {
-        let prompts: [String] = orderedOptions.compactMap { option in
-            guard options.contains(option) else { return nil }
-            return customPrompts[option] ?? option.prompt
-        }
-        guard !prompts.isEmpty else {
-            return nil
-        }
-        return prompts.joined(separator: "\n")
-    }
-}
-
 enum RefineError: Error, LocalizedError {
     case modelNotAvailable
     case refineFailed(String)
@@ -55,16 +18,11 @@ enum RefineError: Error, LocalizedError {
 }
 
 actor RefineService {
+    static let defaultPrompt = "将语音转写的口语文字整理为书面语。去除口语词（嗯、啊、就是、那个等）、删除重复内容、修复断句、添加标点。保持原意，只输出整理后的文字。"
+
     private var session: LanguageModelSession?
-    private var promptComposer = RefinePromptComposer()
 
-    func refine(text: String, options: Set<RefineOption>, customPrompts: [RefineOption: String] = [:]) async throws -> String {
-        promptComposer = RefinePromptComposer(customPrompts: customPrompts)
-        // If no options are selected, return original text
-        guard let prompt = promptComposer.prompt(for: options) else {
-            return text
-        }
-
+    func refine(text: String, prompt: String) async throws -> String {
         // Check availability
         let availability = SystemLanguageModel.default.availability
         guard availability == .available else {
