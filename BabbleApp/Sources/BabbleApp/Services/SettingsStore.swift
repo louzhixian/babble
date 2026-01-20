@@ -17,8 +17,32 @@ final class SettingsStore: ObservableObject {
     private let forceTouchEnabledKey = "forceTouchEnabled"
     private let forceTouchHoldSecondsKey = "forceTouchHoldSeconds"
 
+    // Legacy keys for migration
+    private let legacyDefaultRefineOptionsKey = "defaultRefineOptions"
+    private let legacyRefineMigratedKey = "refineMigrated_v1"
+
     init(userDefaults: UserDefaults = .standard) {
         self.defaults = userDefaults
+        migrateRefineSettingsIfNeeded()
+    }
+
+    /// Migrate from old refine options to new refineEnabled setting
+    private func migrateRefineSettingsIfNeeded() {
+        // Skip if already migrated
+        guard !defaults.bool(forKey: legacyRefineMigratedKey) else { return }
+
+        // Check if old key exists
+        if let oldOptions = defaults.array(forKey: legacyDefaultRefineOptionsKey) as? [String] {
+            // If old options was empty, user had refine disabled
+            if oldOptions.isEmpty {
+                defaults.set(false, forKey: refineEnabledKey)
+            }
+            // Clean up old key
+            defaults.removeObject(forKey: legacyDefaultRefineOptionsKey)
+        }
+
+        // Mark as migrated
+        defaults.set(true, forKey: legacyRefineMigratedKey)
     }
 
     var floatingPanelPosition: FloatingPanelPosition {
