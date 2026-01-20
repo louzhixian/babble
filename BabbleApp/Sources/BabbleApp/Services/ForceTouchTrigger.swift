@@ -13,9 +13,17 @@ final class ForceTouchTrigger {
     private let pressureThreshold: Double
     private let onTriggerStart: () -> Void
     private let onTriggerEnd: () -> Void
-    private var pressureMonitor: Any?
+    private var eventTap: CFMachPort?
+    private var runLoopSource: CFRunLoopSource?
     private var holdTimer: Timer?
     private var state: TriggerState = .idle
+
+    // For detecting mouse movement (to filter out three-finger drag)
+    private var initialMouseLocation: CGPoint?
+    private let movementThreshold: CGFloat = 10.0  // pixels
+
+    // Static reference for C callback
+    private nonisolated(unsafe) static var sharedInstance: ForceTouchTrigger?
 
     init(
         holdSeconds: TimeInterval = 2.0,
@@ -31,48 +39,57 @@ final class ForceTouchTrigger {
 
     func start() {
         stop()
+        ForceTouchTrigger.sharedInstance = self
 
-        print("ForceTouchTrigger: Starting with NSEvent.addGlobalMonitorForEvents")
-        print("ForceTouchTrigger: holdSeconds=\(holdSeconds), pressureThreshold=\(pressureThreshold)")
+        print("ForceTouchTrigger: Starting with holdSeconds=\(holdSeconds), pressureThreshold=\(pressureThreshold)")
 
-        // Try monitoring multiple event types to see what we can receive
-        let eventMask: NSEvent.EventTypeMask = [
-            .pressure,
-            .leftMouseDown,
-            .leftMouseUp,
-            .leftMouseDragged
-        ]
+        // Create event tap for mouse events to capture pressure
+        let eventMask: CGEventMask =
+            (1 << CGEventType.leftMouseDown.rawValue) |
+            (1 << CGEventType.leftMouseUp.rawValue) |
+            (1 << CGEventType.leftMouseDragged.rawValue) |
+            (1 << CGEventType.otherMouseDown.rawValue) |
+            (1 << CGEventType.otherMouseUp.rawValue) |
+            (1 << CGEventType.otherMouseDragged.rawValue) |
+            // NSEventTypePressure = 34
+            (1 << 34)
 
-        pressureMonitor = NSEvent.addGlobalMonitorForEvents(matching: eventMask) { [weak self] event in
-            // Print all events we receive
-            print("ForceTouchTrigger: Event received - type: \(event.type.rawValue) (\(event.type))")
+        eventTap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .listenOnly,
+            eventsOfInterest: eventMask,
+            callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
+                return ForceTouchTrigger.handleEventTapCallback(proxy: proxy, type: type, event: event, refcon: refcon)
+            },
+            userInfo: nil
+        )
 
-            if event.type == .pressure {
-                print("  PRESSURE EVENT: pressure=\(event.pressure), stage=\(event.stage)")
-                Task { @MainActor in
-                    self?.handlePressureEvent(event)
-                }
-            } else {
-                // For mouse events, also check pressure value
-                print("  Mouse event: pressure=\(event.pressure)")
-            }
+        guard let eventTap = eventTap else {
+            print("ForceTouchTrigger: Failed to create event tap. Check Accessibility permissions.")
+            return
         }
 
-        if pressureMonitor != nil {
-            print("ForceTouchTrigger: Global monitor created successfully for: \(eventMask)")
-        } else {
-            print("ForceTouchTrigger: Failed to create monitor. Check Accessibility permissions.")
-        }
+        runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
+        CGEvent.tapEnable(tap: eventTap, enable: true)
+        print("ForceTouchTrigger: Started successfully")
     }
 
     func stop() {
         holdTimer?.invalidate()
         holdTimer = nil
 
-        if let monitor = pressureMonitor {
-            NSEvent.removeMonitor(monitor)
-            pressureMonitor = nil
+        if let eventTap = eventTap {
+            CGEvent.tapEnable(tap: eventTap, enable: false)
         }
+        if let runLoopSource = runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
+        }
+        eventTap = nil
+        runLoopSource = nil
+        ForceTouchTrigger.sharedInstance = nil
+        initialMouseLocation = nil
 
         if case .triggered = state {
             onTriggerEnd()
@@ -80,24 +97,66 @@ final class ForceTouchTrigger {
         state = .idle
     }
 
-    private func handlePressureEvent(_ event: NSEvent) {
-        let pressure = Double(event.pressure)
-        let stage = event.stage
+    private static func handleEventTapCallback(
+        proxy: CGEventTapProxy,
+        type: CGEventType,
+        event: CGEvent,
+        refcon: UnsafeMutableRawPointer?
+    ) -> Unmanaged<CGEvent>? {
+        // Handle tap disabled
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let tap = sharedInstance?.eventTap {
+                CGEvent.tapEnable(tap: tap, enable: true)
+            }
+            return Unmanaged.passUnretained(event)
+        }
 
-        print("ForceTouchTrigger: handlePressureEvent pressure=\(pressure), stage=\(stage), state=\(state)")
+        // Get mouse location for movement detection
+        let mouseLocation = event.location
 
-        // stage 1 = initial click, stage 2 = force click (deep press)
-        // We trigger on sustained pressure above threshold
-        let isPressed = pressure >= pressureThreshold
+        // Convert to NSEvent to read pressure
+        if let nsEvent = NSEvent(cgEvent: event) {
+            let pressure = Double(nsEvent.pressure)
+            Task { @MainActor in
+                sharedInstance?.handlePressureWithLocation(pressure, location: mouseLocation)
+            }
+        }
 
-        handlePressure(isPressed)
+        return Unmanaged.passUnretained(event)
     }
 
-    private func handlePressure(_ isPressed: Bool) {
+    private func handlePressureWithLocation(_ pressure: Double, location: CGPoint) {
+        let isPressed = pressure >= pressureThreshold
+
+        // Check for significant mouse movement (indicates three-finger drag, not Force Touch)
+        if isPressed {
+            if let initial = initialMouseLocation {
+                let dx = abs(location.x - initial.x)
+                let dy = abs(location.y - initial.y)
+                if dx > movementThreshold || dy > movementThreshold {
+                    // Mouse moved significantly - this is likely three-finger drag, not Force Touch
+                    // Cancel the current press
+                    if case .pressing = state {
+                        holdTimer?.invalidate()
+                        holdTimer = nil
+                        state = .idle
+                        initialMouseLocation = nil
+                    }
+                    return
+                }
+            }
+        }
+
+        handlePressure(isPressed, location: location)
+    }
+
+    private func handlePressure(_ isPressed: Bool, location: CGPoint) {
+
         switch state {
         case .idle:
             if isPressed {
                 state = .pressing
+                initialMouseLocation = location  // Record initial position
                 startHoldTimer()
             }
 
@@ -107,11 +166,13 @@ final class ForceTouchTrigger {
                 holdTimer?.invalidate()
                 holdTimer = nil
                 state = .idle
+                initialMouseLocation = nil
             }
 
         case .triggered:
             if !isPressed {
                 state = .idle
+                initialMouseLocation = nil
                 onTriggerEnd()
             }
         }
