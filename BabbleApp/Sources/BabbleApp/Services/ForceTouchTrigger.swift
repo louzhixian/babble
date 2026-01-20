@@ -35,20 +35,33 @@ final class ForceTouchTrigger {
         print("ForceTouchTrigger: Starting with NSEvent.addGlobalMonitorForEvents")
         print("ForceTouchTrigger: holdSeconds=\(holdSeconds), pressureThreshold=\(pressureThreshold)")
 
-        // Use NSEvent global monitor for pressure events
-        pressureMonitor = NSEvent.addGlobalMonitorForEvents(matching: .pressure) { [weak self] event in
-            print("ForceTouchTrigger: Pressure event received!")
-            print("  pressure: \(event.pressure), stage: \(event.stage)")
+        // Try monitoring multiple event types to see what we can receive
+        let eventMask: NSEvent.EventTypeMask = [
+            .pressure,
+            .leftMouseDown,
+            .leftMouseUp,
+            .leftMouseDragged
+        ]
 
-            Task { @MainActor in
-                self?.handlePressureEvent(event)
+        pressureMonitor = NSEvent.addGlobalMonitorForEvents(matching: eventMask) { [weak self] event in
+            // Print all events we receive
+            print("ForceTouchTrigger: Event received - type: \(event.type.rawValue) (\(event.type))")
+
+            if event.type == .pressure {
+                print("  PRESSURE EVENT: pressure=\(event.pressure), stage=\(event.stage)")
+                Task { @MainActor in
+                    self?.handlePressureEvent(event)
+                }
+            } else {
+                // For mouse events, also check pressure value
+                print("  Mouse event: pressure=\(event.pressure)")
             }
         }
 
         if pressureMonitor != nil {
-            print("ForceTouchTrigger: Global pressure monitor created successfully")
+            print("ForceTouchTrigger: Global monitor created successfully for: \(eventMask)")
         } else {
-            print("ForceTouchTrigger: Failed to create pressure monitor. Check Accessibility permissions.")
+            print("ForceTouchTrigger: Failed to create monitor. Check Accessibility permissions.")
         }
     }
 
