@@ -46,6 +46,14 @@ final class SettingsViewModel: ObservableObject {
         didSet { store.forceTouchHoldSeconds = forceTouchHoldSeconds }
     }
 
+    @Published var trackpadHotzoneEnabled: Bool {
+        didSet { store.trackpadHotzoneEnabled = trackpadHotzoneEnabled }
+    }
+
+    @Published var trackpadHotzoneCorner: HotzoneCorner {
+        didSet { store.trackpadHotzoneCorner = trackpadHotzoneCorner }
+    }
+
     private let store: SettingsStore
 
     init(store: SettingsStore) {
@@ -61,6 +69,8 @@ final class SettingsViewModel: ObservableObject {
         hotzoneHoldSeconds = store.hotzoneHoldSeconds
         forceTouchEnabled = store.forceTouchEnabled
         forceTouchHoldSeconds = store.forceTouchHoldSeconds
+        trackpadHotzoneEnabled = store.trackpadHotzoneEnabled
+        trackpadHotzoneCorner = store.trackpadHotzoneCorner
     }
 
     func updateRefinePromptDraft(_ newValue: String) {

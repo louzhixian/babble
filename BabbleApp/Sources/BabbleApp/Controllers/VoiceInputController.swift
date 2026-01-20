@@ -64,6 +64,12 @@ class VoiceInputController: NSObject, ObservableObject {
             name: .settingsForceTouchDidChange,
             object: settingsStore
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleTrackpadHotzoneChange(_:)),
+            name: .settingsTrackpadHotzoneDidChange,
+            object: settingsStore
+        )
     }
 
     func start() {
@@ -74,6 +80,7 @@ class VoiceInputController: NSObject, ObservableObject {
         }
         applyHotzoneSettings()
         applyForceTouchSettings()
+        applyTrackpadHotzoneSettings()
     }
 
     func stop() {
@@ -102,12 +109,26 @@ class VoiceInputController: NSObject, ObservableObject {
         )
     }
 
+    private func applyTrackpadHotzoneSettings() {
+        hotkeyManager.configureTrackpadHotzone(
+            enabled: settingsStore.trackpadHotzoneEnabled,
+            corner: settingsStore.trackpadHotzoneCorner,
+            holdSeconds: settingsStore.hotzoneHoldSeconds  // Share hold time with screen hotzone
+        )
+    }
+
     @objc private func handleHotzoneChange(_ notification: Notification) {
         applyHotzoneSettings()
+        // Also update trackpad hotzone since they share holdSeconds setting
+        applyTrackpadHotzoneSettings()
     }
 
     @objc private func handleForceTouchChange(_ notification: Notification) {
         applyForceTouchSettings()
+    }
+
+    @objc private func handleTrackpadHotzoneChange(_ notification: Notification) {
+        applyTrackpadHotzoneSettings()
     }
 
     @objc private func handleWhisperPortChange(_ notification: Notification) {

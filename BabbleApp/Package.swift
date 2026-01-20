@@ -13,7 +13,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "BabbleApp",
-            path: "Sources/BabbleApp"
+            path: "Sources/BabbleApp",
+            linkerSettings: [
+                .unsafeFlags(["-F/System/Library/PrivateFrameworks", "-framework", "MultitouchSupport"])
+            ]
         ),
         .testTarget(
             name: "BabbleAppTests",

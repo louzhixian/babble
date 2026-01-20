@@ -106,6 +106,19 @@ struct SettingsView: View {
             } footer: {
                 Text("在触控板上用力按压并保持指定时间即可触发录音，松开后开始转写")
             }
+
+            Section {
+                Toggle("启用触控板热区", isOn: $model.trackpadHotzoneEnabled)
+                Picker("热区位置", selection: $model.trackpadHotzoneCorner) {
+                    ForEach(HotzoneCorner.allCases, id: \.self) { corner in
+                        Text(cornerLabel(corner)).tag(corner)
+                    }
+                }
+            } header: {
+                Text("触控板热区触发")
+            } footer: {
+                Text("将手指放在触控板角落并停留指定时间即可触发录音（停留时间与屏幕热区共享设置），抬起手指开始转写")
+            }
         }
         .formStyle(.grouped)
         .padding()

@@ -7,6 +7,7 @@ enum HotkeySource: Sendable {
     case keyboard
     case hotzone
     case forceTouch
+    case trackpadHotzone
 }
 
 enum HotkeyEvent: Sendable {
@@ -29,6 +30,7 @@ class HotkeyManager: ObservableObject {
     private var handler: HotkeyHandler?
     private var hotzoneTrigger: HotzoneTrigger?
     private var forceTouchTrigger: ForceTouchTrigger?
+    private var trackpadHotzoneTrigger: TrackpadHotzoneTrigger?
     private var hotzoneHandler: HotkeyHandler?
 
     // Long press threshold in seconds
@@ -78,6 +80,8 @@ class HotkeyManager: ObservableObject {
         hotzoneTrigger = nil
         forceTouchTrigger?.stop()
         forceTouchTrigger = nil
+        trackpadHotzoneTrigger?.stop()
+        trackpadHotzoneTrigger = nil
         hotzoneHandler = nil
         if let eventTap = eventTap {
             CGEvent.tapEnable(tap: eventTap, enable: false)
@@ -130,6 +134,27 @@ class HotkeyManager: ObservableObject {
             }
         )
         forceTouchTrigger?.start()
+    }
+
+    func configureTrackpadHotzone(enabled: Bool, corner: HotzoneCorner, holdSeconds: TimeInterval) {
+        trackpadHotzoneTrigger?.stop()
+        trackpadHotzoneTrigger = nil
+
+        guard enabled else { return }
+
+        trackpadHotzoneTrigger = TrackpadHotzoneTrigger(
+            corner: corner,
+            holdSeconds: holdSeconds,
+            onTriggerStart: { [weak self] in
+                guard let self, let handler = self.hotzoneHandler else { return }
+                handler(.longPressStart(.trackpadHotzone))
+            },
+            onTriggerEnd: { [weak self] in
+                guard let self, let handler = self.hotzoneHandler else { return }
+                handler(.longPressEnd(.trackpadHotzone))
+            }
+        )
+        trackpadHotzoneTrigger?.start()
     }
 
     private static func handleEventTapCallback(

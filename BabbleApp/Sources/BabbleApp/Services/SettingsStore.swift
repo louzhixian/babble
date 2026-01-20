@@ -16,6 +16,8 @@ final class SettingsStore: ObservableObject {
     private let hotzoneHoldSecondsKey = "hotzoneHoldSeconds"
     private let forceTouchEnabledKey = "forceTouchEnabled"
     private let forceTouchHoldSecondsKey = "forceTouchHoldSeconds"
+    private let trackpadHotzoneEnabledKey = "trackpadHotzoneEnabled"
+    private let trackpadHotzoneCornerKey = "trackpadHotzoneCorner"
 
     init(userDefaults: UserDefaults = .standard) {
         self.defaults = userDefaults
@@ -139,6 +141,28 @@ final class SettingsStore: ObservableObject {
             NotificationCenter.default.post(name: .settingsForceTouchDidChange, object: self)
         }
     }
+
+    var trackpadHotzoneEnabled: Bool {
+        get { defaults.object(forKey: trackpadHotzoneEnabledKey) as? Bool ?? false }
+        set {
+            defaults.set(newValue, forKey: trackpadHotzoneEnabledKey)
+            NotificationCenter.default.post(name: .settingsTrackpadHotzoneDidChange, object: self)
+        }
+    }
+
+    var trackpadHotzoneCorner: HotzoneCorner {
+        get {
+            guard let raw = defaults.string(forKey: trackpadHotzoneCornerKey),
+                  let value = HotzoneCorner(rawValue: raw) else {
+                return .bottomLeft
+            }
+            return value
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: trackpadHotzoneCornerKey)
+            NotificationCenter.default.post(name: .settingsTrackpadHotzoneDidChange, object: self)
+        }
+    }
 }
 
 enum HotzoneCorner: String, CaseIterable, Sendable {
@@ -152,5 +176,6 @@ extension Notification.Name {
     static let settingsHistoryLimitDidChange = Notification.Name("SettingsStore.historyLimitDidChange")
     static let settingsHotzoneDidChange = Notification.Name("SettingsStore.hotzoneDidChange")
     static let settingsForceTouchDidChange = Notification.Name("SettingsStore.forceTouchDidChange")
+    static let settingsTrackpadHotzoneDidChange = Notification.Name("SettingsStore.trackpadHotzoneDidChange")
     static let settingsWhisperPortDidChange = Notification.Name("SettingsStore.whisperPortDidChange")
 }
