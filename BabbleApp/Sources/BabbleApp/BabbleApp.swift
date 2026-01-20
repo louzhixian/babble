@@ -7,14 +7,7 @@ struct BabbleApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        WindowGroup {
-            MainWindowView(
-                historyStore: appDelegate.coordinator.historyStore,
-                settingsStore: appDelegate.coordinator.settingsStore,
-                router: appDelegate.coordinator.mainWindowRouter
-            )
-        }
-
+        // Main window is managed manually by AppDelegate for LSUIElement compatibility
         Settings {
             SettingsView(store: appDelegate.coordinator.settingsStore)
         }

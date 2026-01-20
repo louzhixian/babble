@@ -129,28 +129,32 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc private func showMainWindow() {
         NSApp.activate(ignoringOtherApps: true)
-        if let window = NSApp.windows.first(where: { !($0 is FloatingPanelWindow) }) {
+
+        // Reuse existing main window if available
+        if let window = mainWindow {
             window.makeKeyAndOrderFront(nil)
-        } else {
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 1000, height: 720),
-                styleMask: [.titled, .closable, .miniaturizable, .resizable],
-                backing: .buffered,
-                defer: false
-            )
-            window.title = "Babble"
-            window.contentViewController = NSHostingController(
-                rootView: MainWindowView(
-                    historyStore: coordinator.historyStore,
-                    settingsStore: coordinator.settingsStore,
-                    router: coordinator.mainWindowRouter
-                )
-            )
-            window.delegate = self
-            window.center()
-            window.makeKeyAndOrderFront(nil)
-            mainWindow = window
+            return
         }
+
+        // Create new main window
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1000, height: 720),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Babble"
+        window.contentViewController = NSHostingController(
+            rootView: MainWindowView(
+                historyStore: coordinator.historyStore,
+                settingsStore: coordinator.settingsStore,
+                router: coordinator.mainWindowRouter
+            )
+        )
+        window.delegate = self
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        mainWindow = window
     }
 
     func windowWillClose(_ notification: Notification) {
