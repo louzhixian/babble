@@ -23,6 +23,10 @@ final class ForceTouchTrigger {
     private var initialMouseLocation: CGPoint?
     private let movementThreshold: CGFloat = 2.0  // pixels - if mouse moves more than this, cancel
 
+    // Track if movement was ever detected during current touch cycle
+    // Once movement is detected, we won't trigger even if the finger stops moving
+    private var hadMovementDuringTouch = false
+
     // Static reference for C callback
     private nonisolated(unsafe) static var sharedInstance: ForceTouchTrigger?
 
@@ -99,6 +103,7 @@ final class ForceTouchTrigger {
         runLoopSource = nil
         ForceTouchTrigger.sharedInstance = nil
         initialMouseLocation = nil
+        hadMovementDuringTouch = false
 
         if case .triggered = state {
             onTriggerEnd()
@@ -138,18 +143,30 @@ final class ForceTouchTrigger {
     private func handlePressureWithLocation(_ pressure: Double, location: CGPoint) {
         let isPressed = pressure >= pressureThreshold
 
-        // Check for mouse movement when pressing (to filter out three-finger drag)
-        if case .pressing = state, let initial = initialMouseLocation {
+        // Check for mouse movement (to filter out three-finger drag)
+        // Once movement is detected, mark it - we won't trigger even if finger stops moving later
+        if let initial = initialMouseLocation {
             let dx = abs(location.x - initial.x)
             let dy = abs(location.y - initial.y)
             if dx > movementThreshold || dy > movementThreshold {
-                // Mouse moved - this is likely three-finger drag, not Force Touch
+                hadMovementDuringTouch = true
+            }
+        }
+
+        // If movement was detected during this touch cycle, cancel any pending trigger
+        if hadMovementDuringTouch {
+            if case .pressing = state {
                 holdTimer?.invalidate()
                 holdTimer = nil
                 state = .idle
-                initialMouseLocation = nil
-                return
             }
+            // Don't start new press if we had movement
+            if !isPressed {
+                // Reset when finger is lifted
+                initialMouseLocation = nil
+                hadMovementDuringTouch = false
+            }
+            return
         }
 
         switch state {
@@ -157,6 +174,7 @@ final class ForceTouchTrigger {
             if isPressed {
                 state = .pressing
                 initialMouseLocation = location
+                hadMovementDuringTouch = false
                 startHoldTimer()
             }
 
@@ -167,12 +185,14 @@ final class ForceTouchTrigger {
                 holdTimer = nil
                 state = .idle
                 initialMouseLocation = nil
+                hadMovementDuringTouch = false
             }
 
         case .triggered:
             if !isPressed {
                 state = .idle
                 initialMouseLocation = nil
+                hadMovementDuringTouch = false
                 onTriggerEnd()
             }
         }
