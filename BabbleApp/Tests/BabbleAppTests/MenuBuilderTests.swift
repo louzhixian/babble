@@ -13,4 +13,15 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertFalse(titles.contains("Show Panel"))
         XCTAssertFalse(titles.contains("Hide Panel"))
     }
+
+    @MainActor
+    func testMenuIncludesMainWindowAndSettingsItems() {
+        let controller = VoiceInputController()
+        let store = SettingsStore()
+        let menu = MenuBuilder().makeMenu(controller: controller, settingsStore: store)
+        let titles = menu.items.map { $0.title }
+
+        XCTAssertTrue(titles.contains("Main Window"))
+        XCTAssertTrue(titles.contains("Settings..."))
+    }
 }

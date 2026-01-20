@@ -4,11 +4,13 @@ import Foundation
 final class AppCoordinator: NSObject, ObservableObject {
     let historyStore: HistoryStore
     let settingsStore: SettingsStore
+    let mainWindowRouter: MainWindowRouter
     let voiceInputController: VoiceInputController
 
     init(settingsStore: SettingsStore = SettingsStore()) {
         self.settingsStore = settingsStore
         self.historyStore = HistoryStore(limit: settingsStore.historyLimit)
+        self.mainWindowRouter = MainWindowRouter()
         self.voiceInputController = VoiceInputController(
             historyStore: historyStore,
             settingsStore: settingsStore

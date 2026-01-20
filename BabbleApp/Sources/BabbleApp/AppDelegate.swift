@@ -30,6 +30,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let actions = MenuActions(
             target: self,
+            showMainWindow: #selector(showMainWindow),
+            showSettings: #selector(showSettings),
             setRefineOff: #selector(setRefineOff(_:)),
             toggleRefineOption: #selector(toggleRefineOption(_:)),
             setPanelPosition: #selector(setPanelPosition(_:)),
@@ -123,6 +125,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let position = item.representedObject as? FloatingPanelPosition else { continue }
             item.state = coordinator.settingsStore.floatingPanelPosition == position ? .on : .off
         }
+    }
+
+    @objc private func showMainWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        if let window = NSApp.windows.first(where: { !($0 is FloatingPanelWindow) }) {
+            window.makeKeyAndOrderFront(nil)
+        }
+    }
+
+    @objc private func showSettings() {
+        coordinator.mainWindowRouter.selection = .settings
+        showMainWindow()
     }
 
     @objc private func quit() {

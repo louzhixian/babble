@@ -2,6 +2,8 @@ import AppKit
 
 struct MenuActions {
     let target: AnyObject?
+    let showMainWindow: Selector?
+    let showSettings: Selector?
     let setRefineOff: Selector?
     let toggleRefineOption: Selector?
     let setPanelPosition: Selector?
@@ -9,12 +11,16 @@ struct MenuActions {
 
     init(
         target: AnyObject? = nil,
+        showMainWindow: Selector? = nil,
+        showSettings: Selector? = nil,
         setRefineOff: Selector? = nil,
         toggleRefineOption: Selector? = nil,
         setPanelPosition: Selector? = nil,
         quit: Selector? = nil
     ) {
         self.target = target
+        self.showMainWindow = showMainWindow
+        self.showSettings = showSettings
         self.setRefineOff = setRefineOff
         self.toggleRefineOption = toggleRefineOption
         self.setPanelPosition = setPanelPosition
@@ -30,6 +36,16 @@ struct MenuBuilder {
         actions: MenuActions = MenuActions()
     ) -> NSMenu {
         let menu = NSMenu()
+
+        let mainWindowItem = NSMenuItem(title: "Main Window", action: actions.showMainWindow, keyEquivalent: "m")
+        mainWindowItem.target = actions.target
+        menu.addItem(mainWindowItem)
+
+        let settingsItem = NSMenuItem(title: "Settings...", action: actions.showSettings, keyEquivalent: ",")
+        settingsItem.target = actions.target
+        menu.addItem(settingsItem)
+
+        menu.addItem(NSMenuItem.separator())
 
         // Refine options submenu
         let refineOptionsItem = NSMenuItem(title: "Refine Options", action: nil, keyEquivalent: "")

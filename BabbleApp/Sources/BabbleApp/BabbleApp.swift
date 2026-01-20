@@ -10,7 +10,8 @@ struct BabbleApp: App {
         WindowGroup {
             MainWindowView(
                 historyStore: appDelegate.coordinator.historyStore,
-                settingsStore: appDelegate.coordinator.settingsStore
+                settingsStore: appDelegate.coordinator.settingsStore,
+                router: appDelegate.coordinator.mainWindowRouter
             )
         }
 

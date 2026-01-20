@@ -12,11 +12,16 @@ final class MainWindowRouter: ObservableObject {
 }
 
 struct MainWindowView: View {
-    @StateObject private var router = MainWindowRouter()
+    @StateObject private var router: MainWindowRouter
     @ObservedObject var historyStore: HistoryStore
     let settingsStore: SettingsStore
 
-    init(historyStore: HistoryStore = HistoryStore(limit: 100), settingsStore: SettingsStore = SettingsStore()) {
+    init(
+        historyStore: HistoryStore = HistoryStore(limit: 100),
+        settingsStore: SettingsStore = SettingsStore(),
+        router: MainWindowRouter = MainWindowRouter()
+    ) {
+        _router = StateObject(wrappedValue: router)
         self.historyStore = historyStore
         self.settingsStore = settingsStore
     }
