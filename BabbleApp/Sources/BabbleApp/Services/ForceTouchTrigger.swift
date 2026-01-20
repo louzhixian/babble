@@ -39,6 +39,9 @@ final class ForceTouchTrigger {
         self.onTriggerEnd = onTriggerEnd
     }
 
+    // Debug: NSEvent global monitor for pressure events
+    private var pressureMonitor: Any?
+
     func start() {
         stop()
         ForceTouchTrigger.sharedInstance = self
@@ -51,6 +54,12 @@ final class ForceTouchTrigger {
             AXIsProcessTrustedWithOptions(options as CFDictionary)
             return
         }
+
+        // DEBUG: Add NSEvent global monitor for pressure events
+        pressureMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.pressure]) { e in
+            print("DEBUG pressure: type=\(e.type) pressure=\(e.pressure) stage=\(e.stage) transition=\(e.stageTransition) behavior=\(e.pressureBehavior)")
+        }
+        print("ForceTouchTrigger: Added pressure monitor")
 
         // Create event tap for all mouse events to capture pressure
         // CGEventMaskBit for pressure events is not directly available,
@@ -89,6 +98,12 @@ final class ForceTouchTrigger {
     func stop() {
         holdTimer?.invalidate()
         holdTimer = nil
+
+        // Remove pressure monitor
+        if let monitor = pressureMonitor {
+            NSEvent.removeMonitor(monitor)
+            pressureMonitor = nil
+        }
 
         if let eventTap = eventTap {
             CGEvent.tapEnable(tap: eventTap, enable: false)
@@ -133,6 +148,9 @@ final class ForceTouchTrigger {
             // The stage property is only meaningful for pressure events
             let isPressureEvent = nsEvent.type == .pressure
             let stage = isPressureEvent ? nsEvent.stage : -1
+
+            // DEBUG: Log all events from CGEvent tap
+            print("DEBUG CGEvent: type=\(type.rawValue) nsType=\(nsEvent.type.rawValue) pressure=\(pressure) stage=\(stage) isPressure=\(isPressureEvent)")
 
             Task { @MainActor in
                 sharedInstance?.handlePressureEvent(
