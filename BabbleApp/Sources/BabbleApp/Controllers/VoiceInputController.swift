@@ -233,6 +233,43 @@ class VoiceInputController: NSObject, ObservableObject {
         state = .transcribing
         panelState = FloatingPanelState(status: .processing, message: nil)
 
+        // Validate audio before sending to Whisper
+        let validator = AudioValidator()
+        let validationResult = await validator.validate(audioURL: url)
+
+        switch validationResult {
+        case .tooShort(let duration):
+            state = .error("录音太短")
+            panelState = FloatingPanelState(
+                status: .error,
+                message: "录音时长不足 1 秒 (\(String(format: "%.1f", duration)) 秒)"
+            )
+            try? FileManager.default.removeItem(at: url)
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            if case .error = state {
+                state = .idle
+                panelState = FloatingPanelState(status: .idle, message: nil)
+            }
+            return
+
+        case .silent:
+            state = .error("没有检测到声音")
+            panelState = FloatingPanelState(
+                status: .error,
+                message: "录音中没有检测到声音内容"
+            )
+            try? FileManager.default.removeItem(at: url)
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            if case .error = state {
+                state = .idle
+                panelState = FloatingPanelState(status: .idle, message: nil)
+            }
+            return
+
+        case .valid:
+            break
+        }
+
         do {
             // Ensure Whisper service is running
             try await processManager.ensureRunning()

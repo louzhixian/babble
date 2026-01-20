@@ -10,9 +10,9 @@ final class SettingsViewModel: ObservableObject {
         didSet { store.refineEnabled = refineEnabled }
     }
 
-    @Published var refinePrompt: String {
-        didSet { store.refinePrompt = refinePrompt }
-    }
+    // Refine prompt uses explicit save, not auto-save
+    @Published var refinePromptDraft: String
+    @Published var refinePromptHasChanges: Bool = false
 
     @Published var defaultLanguage: String {
         didSet { store.defaultLanguage = defaultLanguage }
@@ -52,7 +52,7 @@ final class SettingsViewModel: ObservableObject {
         self.store = store
         historyLimit = store.historyLimit
         refineEnabled = store.refineEnabled
-        refinePrompt = store.refinePrompt
+        refinePromptDraft = store.refinePrompt
         defaultLanguage = store.defaultLanguage
         whisperPort = store.whisperPort
         clearClipboardAfterCopy = store.clearClipboardAfterCopy
@@ -61,5 +61,20 @@ final class SettingsViewModel: ObservableObject {
         hotzoneHoldSeconds = store.hotzoneHoldSeconds
         forceTouchEnabled = store.forceTouchEnabled
         forceTouchHoldSeconds = store.forceTouchHoldSeconds
+    }
+
+    func updateRefinePromptDraft(_ newValue: String) {
+        refinePromptDraft = newValue
+        refinePromptHasChanges = newValue != store.refinePrompt
+    }
+
+    func saveRefinePrompt() {
+        store.refinePrompt = refinePromptDraft
+        refinePromptHasChanges = false
+    }
+
+    func discardRefinePromptChanges() {
+        refinePromptDraft = store.refinePrompt
+        refinePromptHasChanges = false
     }
 }
