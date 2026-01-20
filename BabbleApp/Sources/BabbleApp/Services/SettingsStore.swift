@@ -141,9 +141,12 @@ final class SettingsStore: ObservableObject {
     // Default: Option + Space (keyCode 49 = Space, modifiers includes Option)
     var hotkeyKeyCode: UInt16 {
         get {
-            let stored = defaults.integer(forKey: hotkeyKeyCodeKey)
-            // Default to Space (keyCode 49)
-            return stored > 0 ? UInt16(stored) : 49
+            // Use object(forKey:) to detect unset vs stored 0
+            // keyCode 0 is valid (A key), so we can't use stored > 0
+            if defaults.object(forKey: hotkeyKeyCodeKey) == nil {
+                return 49  // Default to Space
+            }
+            return UInt16(defaults.integer(forKey: hotkeyKeyCodeKey))
         }
         set {
             defaults.set(Int(newValue), forKey: hotkeyKeyCodeKey)
