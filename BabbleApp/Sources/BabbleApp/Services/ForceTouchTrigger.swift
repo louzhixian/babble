@@ -99,20 +99,29 @@ final class ForceTouchTrigger {
     ) -> Unmanaged<CGEvent>? {
         // Handle tap disabled
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            print("ForceTouchTrigger: Event tap disabled, re-enabling...")
             if let tap = sharedInstance?.eventTap {
                 CGEvent.tapEnable(tap: tap, enable: true)
             }
             return Unmanaged.passUnretained(event)
         }
 
+        // Debug: print all received event types
+        print("ForceTouchTrigger: Received CGEvent type: \(type.rawValue)")
+
         // Convert to NSEvent to read pressure
-        // Only process pressure events (type 34) - filter out mouse events
-        // that may have pressure values but are not from Force Touch
-        // (e.g., three-finger drag generates mouse events with pressure)
-        if let nsEvent = NSEvent(cgEvent: event), nsEvent.type == .pressure {
-            let pressure = Double(nsEvent.pressure)
-            Task { @MainActor in
-                sharedInstance?.handlePressure(pressure)
+        if let nsEvent = NSEvent(cgEvent: event) {
+            print("ForceTouchTrigger: NSEvent type: \(nsEvent.type.rawValue), pressure: \(nsEvent.pressure)")
+
+            // Only process pressure events (type 34) - filter out mouse events
+            // that may have pressure values but are not from Force Touch
+            // (e.g., three-finger drag generates mouse events with pressure)
+            if nsEvent.type == .pressure {
+                let pressure = Double(nsEvent.pressure)
+                print("ForceTouchTrigger: Processing pressure event: \(pressure)")
+                Task { @MainActor in
+                    sharedInstance?.handlePressure(pressure)
+                }
             }
         }
 
