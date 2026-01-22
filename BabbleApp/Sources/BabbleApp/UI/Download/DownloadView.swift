@@ -159,7 +159,7 @@ struct DownloadView: View {
                 .buttonStyle(.bordered)
             }
 
-            Text("Download the file manually and place it in:\n~/Library/Application Support/Babble/")
+            Text("Download both whisper-service and whisper-service.sha256,\nthen place them in ~/Library/Application Support/Babble/")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
