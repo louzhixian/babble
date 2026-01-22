@@ -5,6 +5,9 @@ on:
     tags:
       - 'whisper-v*'
 
+permissions:
+  contents: write
+
 jobs:
   build-and-release:
     runs-on: macos-14
