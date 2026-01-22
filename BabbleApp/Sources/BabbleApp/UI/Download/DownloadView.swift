@@ -1,0 +1,184 @@
+// BabbleApp/Sources/BabbleApp/UI/Download/DownloadView.swift
+
+import AppKit
+import SwiftUI
+
+/// View displayed during first-launch download of whisper-service
+struct DownloadView: View {
+    @ObservedObject var downloadManager: DownloadManager
+    var onComplete: () -> Void
+
+    private let byteFormatter: ByteCountFormatter = {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter
+    }()
+
+    var body: some View {
+        VStack(spacing: 24) {
+            // Icon
+            stateIcon
+                .font(.system(size: 48))
+                .frame(height: 60)
+
+            // Title
+            Text("Setting Up Babble")
+                .font(.title)
+                .fontWeight(.semibold)
+
+            // Content based on state
+            stateContent
+        }
+        .padding(32)
+        .frame(width: 400, height: 300)
+        .onChange(of: downloadManager.state) { _, newState in
+            if case .completed = newState {
+                onComplete()
+            }
+        }
+    }
+
+    // MARK: - State Icon
+
+    @ViewBuilder
+    private var stateIcon: some View {
+        switch downloadManager.state {
+        case .idle, .checking:
+            Image(systemName: "arrow.down.circle")
+                .foregroundColor(.blue)
+
+        case .downloading:
+            Image(systemName: "arrow.down.circle")
+                .foregroundColor(.blue)
+
+        case .verifying:
+            Image(systemName: "arrow.down.circle")
+                .foregroundColor(.blue)
+
+        case .failed:
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.orange)
+
+        case .completed:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.green)
+        }
+    }
+
+    // MARK: - State Content
+
+    @ViewBuilder
+    private var stateContent: some View {
+        switch downloadManager.state {
+        case .idle, .checking:
+            checkingContent
+
+        case .downloading(let progress, let downloadedBytes, let totalBytes):
+            downloadingContent(progress: progress, downloadedBytes: downloadedBytes, totalBytes: totalBytes)
+
+        case .verifying:
+            verifyingContent
+
+        case .failed(let error, let retryCount):
+            failedContent(error: error, retryCount: retryCount)
+
+        case .completed:
+            completedContent
+        }
+    }
+
+    // MARK: - Checking Content
+
+    private var checkingContent: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.regular)
+            Text("Checking for updates...")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Downloading Content
+
+    private func downloadingContent(progress: Double, downloadedBytes: Int64, totalBytes: Int64) -> some View {
+        VStack(spacing: 12) {
+            ProgressView(value: progress)
+                .progressViewStyle(.linear)
+                .frame(width: 280)
+
+            Text("Downloading speech engine...")
+                .foregroundStyle(.secondary)
+
+            Text(formatDownloadProgress(downloadedBytes: downloadedBytes, totalBytes: totalBytes))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+    }
+
+    private func formatDownloadProgress(downloadedBytes: Int64, totalBytes: Int64) -> String {
+        let downloadedStr = byteFormatter.string(fromByteCount: downloadedBytes)
+        if totalBytes > 0 {
+            let totalStr = byteFormatter.string(fromByteCount: totalBytes)
+            return "\(downloadedStr) / \(totalStr)"
+        } else {
+            return downloadedStr
+        }
+    }
+
+    // MARK: - Verifying Content
+
+    private var verifyingContent: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.regular)
+            Text("Verifying download...")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Failed Content
+
+    private func failedContent(error: DownloadError, retryCount: Int) -> some View {
+        VStack(spacing: 16) {
+            Text("Download Failed")
+                .font(.headline)
+                .foregroundColor(.primary)
+
+            Text(error.localizedDescription)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 300)
+
+            HStack(spacing: 16) {
+                if retryCount < 3 {
+                    Button("Retry") {
+                        Task {
+                            await downloadManager.retry()
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+
+                Button("Manual Download") {
+                    NSWorkspace.shared.open(downloadManager.manualDownloadURL)
+                }
+                .buttonStyle(.bordered)
+            }
+
+            Text("Download the file manually and place it in:\n~/Library/Application Support/Babble/")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    // MARK: - Completed Content
+
+    private var completedContent: some View {
+        Text("Ready!")
+            .font(.headline)
+            .foregroundColor(.green)
+    }
+}
