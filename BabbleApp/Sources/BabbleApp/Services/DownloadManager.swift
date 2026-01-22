@@ -66,7 +66,9 @@ final class DownloadManager: ObservableObject {
     private let binaryName = "whisper-service"
     private let checksumFileName = "whisper-service.sha256"
 
+    // These URLs are constructed from compile-time constants, so force-unwrap is safe
     private var releaseBaseURL: URL {
+        // swiftlint:disable:next force_unwrapping
         URL(string: "https://github.com/\(owner)/\(repo)/releases/download/\(version)")!
     }
 
@@ -83,7 +85,10 @@ final class DownloadManager: ObservableObject {
     private let fileManager = FileManager.default
 
     var applicationSupportDirectory: URL {
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        // Application Support directory always exists on macOS
+        guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            fatalError("Application Support directory not available")
+        }
         return appSupport.appendingPathComponent("Babble")
     }
 
@@ -106,8 +111,16 @@ final class DownloadManager: ObservableObject {
 
     // MARK: - Initialization
 
-    init(session: URLSession = .shared) {
-        self.session = session
+    init(session: URLSession? = nil) {
+        // Use custom session with extended timeout for large downloads
+        if let session = session {
+            self.session = session
+        } else {
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = 300  // 5 minutes per request
+            config.timeoutIntervalForResource = 3600  // 1 hour total for download
+            self.session = URLSession(configuration: config)
+        }
     }
 
     // MARK: - Public Methods
@@ -145,15 +158,16 @@ final class DownloadManager: ObservableObject {
         await performDownload()
     }
 
-    /// Retries a failed download
+    /// Retries a failed download (up to maxRetries times)
     func retry() async {
-        guard case .failed = state else { return }
+        guard case .failed(_, let retries) = state, retries < maxRetries else { return }
         currentRetryCount += 1
         await performDownload()
     }
 
     /// Returns the GitHub releases page URL for manual download
     var manualDownloadURL: URL {
+        // swiftlint:disable:next force_unwrapping
         URL(string: "https://github.com/\(owner)/\(repo)/releases/tag/\(version)")!
     }
 
