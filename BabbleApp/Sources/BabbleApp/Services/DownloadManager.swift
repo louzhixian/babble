@@ -208,6 +208,26 @@ final class DownloadManager: ObservableObject {
         await performDownload()
     }
 
+    /// Verifies existing binary in background and re-downloads if corrupted
+    /// Called on normal startup when files exist - runs silently without UI
+    func verifyAndRepairInBackground() async {
+        // Verify checksum in background
+        if await verifyChecksumAsync() {
+            // Binary is valid, ensure it's executable
+            do {
+                try makeExecutable()
+            } catch {
+                // Non-fatal: binary might already be executable
+            }
+            return
+        }
+
+        // Checksum failed - binary is corrupted, need to re-download
+        // This will trigger download UI via state change if observed
+        currentRetryCount = 0
+        await performDownload()
+    }
+
     /// Returns the GitHub releases page URL for manual download
     var manualDownloadURL: URL {
         // swiftlint:disable:next force_unwrapping
