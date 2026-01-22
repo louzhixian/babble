@@ -42,6 +42,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func showDownloadWindow() {
+        // Activate app first to ensure window will be visible
+        NSApp.activate(ignoringOtherApps: true)
+
         let downloadView = DownloadView(downloadManager: coordinator.downloadManager) { [weak self] in
             self?.downloadWindow?.close()
             self?.downloadWindow = nil
@@ -62,8 +65,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.center()
         downloadWindow = window
 
+        // Use orderFrontRegardless to ensure window appears even on fresh launch
         window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        window.orderFrontRegardless()
 
         // Start the download
         Task {
@@ -112,10 +116,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
         }
 
-        // Check accessibility permission
-        if !PasteService.checkAccessibility(prompt: true) {
-            showPermissionAlert(for: "Accessibility")
-        }
+        // Note: Accessibility permission is checked by ForceTouchTrigger.start()
+        // and PasteService when actually needed. We don't prompt here to avoid
+        // duplicate system dialogs.
     }
 
     private func showPermissionAlert(for permission: String) {
