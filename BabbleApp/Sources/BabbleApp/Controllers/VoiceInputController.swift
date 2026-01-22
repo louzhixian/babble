@@ -64,6 +64,12 @@ class VoiceInputController: NSObject, ObservableObject {
             name: .settingsForceTouchDidChange,
             object: settingsStore
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleHotkeyChange(_:)),
+            name: .settingsHotkeyDidChange,
+            object: settingsStore
+        )
     }
 
     func start() {
@@ -72,6 +78,7 @@ class VoiceInputController: NSObject, ObservableObject {
                 self?.handleHotkeyEvent(event)
             }
         }
+        applyHotkeySettings()
         applyHotzoneSettings()
         applyForceTouchSettings()
     }
@@ -85,6 +92,11 @@ class VoiceInputController: NSObject, ObservableObject {
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+    }
+
+    private func applyHotkeySettings() {
+        let config = settingsStore.hotkeyConfig
+        hotkeyManager.configureHotkey(keyCode: config.keyCode, modifiers: config.modifiers)
     }
 
     private func applyHotzoneSettings() {
@@ -108,6 +120,10 @@ class VoiceInputController: NSObject, ObservableObject {
 
     @objc private func handleForceTouchChange(_ notification: Notification) {
         applyForceTouchSettings()
+    }
+
+    @objc private func handleHotkeyChange(_ notification: Notification) {
+        applyHotkeySettings()
     }
 
     @objc private func handleWhisperPortChange(_ notification: Notification) {
@@ -326,7 +342,7 @@ class VoiceInputController: NSObject, ObservableObject {
                 do {
                     finalText = try await refineService.refine(
                         text: result.text,
-                        prompt: settingsStore.effectiveRefinePrompt
+                        prompt: settingsStore.refinePrompt
                     )
                 } catch {
                     // Refinement failed (e.g., AFM not available), use raw transcription

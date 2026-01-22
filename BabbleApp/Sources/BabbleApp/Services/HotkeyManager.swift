@@ -34,15 +34,18 @@ class HotkeyManager: ObservableObject {
     // Long press threshold in seconds
     private let longPressThreshold: TimeInterval = 0.3
 
-    // Default hotkey: Option + Space
-    private let hotkeyKeyCode: CGKeyCode = CGKeyCode(kVK_Space)
-    private let hotkeyModifierMask: CGEventFlags = .maskAlternate
+    // Configurable hotkey (default: Option + Space)
+    private var hotkeyKeyCode: CGKeyCode = CGKeyCode(kVK_Space)
+    private var hotkeyModifiers: UInt64 = 0x80000  // Option key
 
     // ESC key for canceling recording
     private let escapeKeyCode: CGKeyCode = CGKeyCode(kVK_Escape)
 
     // Static callback context - nonisolated for C callback access
     private nonisolated(unsafe) static var sharedInstance: HotkeyManager?
+    // Static hotkey config for callback access (since callback is nonisolated)
+    private nonisolated(unsafe) static var currentHotkeyKeyCode: CGKeyCode = CGKeyCode(kVK_Space)
+    private nonisolated(unsafe) static var currentHotkeyModifiers: UInt64 = 0x80000
 
     func register(handler: @escaping HotkeyHandler) {
         self.handler = handler
@@ -132,6 +135,36 @@ class HotkeyManager: ObservableObject {
         forceTouchTrigger?.start()
     }
 
+    func configureHotkey(keyCode: UInt16, modifiers: UInt64) {
+        hotkeyKeyCode = CGKeyCode(keyCode)
+        hotkeyModifiers = modifiers
+        // Update static variables for callback access
+        HotkeyManager.currentHotkeyKeyCode = CGKeyCode(keyCode)
+        HotkeyManager.currentHotkeyModifiers = modifiers
+    }
+
+    /// Check if the event flags contain the required modifiers
+    private static func checkModifiers(flags: CGEventFlags, required: UInt64) -> Bool {
+        // Map our stored modifier values to CGEventFlags
+        // Control: 0x40000, Option: 0x80000, Shift: 0x20000, Command: 0x100000
+        var hasAllRequired = true
+
+        if required & 0x40000 != 0 {  // Control
+            hasAllRequired = hasAllRequired && flags.contains(.maskControl)
+        }
+        if required & 0x80000 != 0 {  // Option
+            hasAllRequired = hasAllRequired && flags.contains(.maskAlternate)
+        }
+        if required & 0x20000 != 0 {  // Shift
+            hasAllRequired = hasAllRequired && flags.contains(.maskShift)
+        }
+        if required & 0x100000 != 0 {  // Command
+            hasAllRequired = hasAllRequired && flags.contains(.maskCommand)
+        }
+
+        return hasAllRequired
+    }
+
     private static func handleEventTapCallback(
         proxy: CGEventTapProxy,
         type: CGEventType,
@@ -163,14 +196,20 @@ class HotkeyManager: ObservableObject {
         }
 
         // Check if this is our hotkey
-        // For keyDown: require Option + Space
-        // For keyUp: if we're tracking a press (isKeyDown), accept Space release even without Option
-        //           (user may release Option before Space, which is common)
+        // For keyDown: require configured key + modifiers
+        // For keyUp: if we're tracking a press (isKeyDown), accept key release even without modifiers
+        //           (user may release modifier before key, which is common)
+        let configuredKeyCode = currentHotkeyKeyCode
+        let configuredModifiers = currentHotkeyModifiers
+
+        // Check if required modifiers are pressed
+        let hasRequiredModifiers = checkModifiers(flags: flags, required: configuredModifiers)
+
         let isKeyDownHotkey = type == .keyDown &&
-            keyCode == instance.hotkeyKeyCode &&
-            flags.contains(instance.hotkeyModifierMask)
+            keyCode == configuredKeyCode &&
+            hasRequiredModifiers
         let isKeyUpHotkey = type == .keyUp &&
-            keyCode == instance.hotkeyKeyCode &&
+            keyCode == configuredKeyCode &&
             instance.isKeyDown
 
         if isKeyDownHotkey || isKeyUpHotkey {

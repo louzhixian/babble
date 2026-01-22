@@ -13,6 +13,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let coordinator = AppCoordinator()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Ensure app shows in Dock (Info.plist LSUIElement is ignored by swift run)
+        NSApp.setActivationPolicy(.regular)
+
         if coordinator.downloadManager.isDownloadNeeded() {
             showDownloadWindow()
         } else {

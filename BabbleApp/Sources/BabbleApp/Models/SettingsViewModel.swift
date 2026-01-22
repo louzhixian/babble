@@ -10,16 +10,12 @@ final class SettingsViewModel: ObservableObject {
         didSet { store.refineEnabled = refineEnabled }
     }
 
-    // Refine prompt uses explicit save, not auto-save
-    @Published var refinePromptDraft: String
-    @Published var refinePromptHasChanges: Bool = false
+    @Published var refinePrompt: String {
+        didSet { store.refinePrompt = refinePrompt }
+    }
 
     @Published var defaultLanguage: String {
         didSet { store.defaultLanguage = defaultLanguage }
-    }
-
-    @Published var whisperPort: Int {
-        didSet { store.whisperPort = whisperPort }
     }
 
     @Published var clearClipboardAfterCopy: Bool {
@@ -46,35 +42,28 @@ final class SettingsViewModel: ObservableObject {
         didSet { store.forceTouchHoldSeconds = forceTouchHoldSeconds }
     }
 
+    @Published var hotkeyConfig: HotkeyConfig {
+        didSet { store.hotkeyConfig = hotkeyConfig }
+    }
+
     private let store: SettingsStore
 
     init(store: SettingsStore) {
         self.store = store
         historyLimit = store.historyLimit
         refineEnabled = store.refineEnabled
-        refinePromptDraft = store.refinePrompt
+        refinePrompt = store.refinePrompt
         defaultLanguage = store.defaultLanguage
-        whisperPort = store.whisperPort
         clearClipboardAfterCopy = store.clearClipboardAfterCopy
         hotzoneEnabled = store.hotzoneEnabled
         hotzoneCorner = store.hotzoneCorner
         hotzoneHoldSeconds = store.hotzoneHoldSeconds
         forceTouchEnabled = store.forceTouchEnabled
         forceTouchHoldSeconds = store.forceTouchHoldSeconds
+        hotkeyConfig = store.hotkeyConfig
     }
 
-    func updateRefinePromptDraft(_ newValue: String) {
-        refinePromptDraft = newValue
-        refinePromptHasChanges = newValue != store.refinePrompt
-    }
-
-    func saveRefinePrompt() {
-        store.refinePrompt = refinePromptDraft
-        refinePromptHasChanges = false
-    }
-
-    func discardRefinePromptChanges() {
-        refinePromptDraft = store.refinePrompt
-        refinePromptHasChanges = false
+    func resetRefinePrompt() {
+        refinePrompt = RefineService.defaultPrompt
     }
 }

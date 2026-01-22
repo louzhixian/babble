@@ -13,7 +13,7 @@
     <key>LSMinimumSystemVersion</key>
     <string>26.0</string>
     <key>LSUIElement</key>
-    <true/>
+    <false/>
     <key>NSMicrophoneUsageDescription</key>
     <string>Babble needs microphone access to record your voice for speech-to-text transcription.</string>
     <key>NSAppleEventsUsageDescription</key>

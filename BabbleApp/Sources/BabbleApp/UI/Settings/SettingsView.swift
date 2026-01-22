@@ -3,7 +3,8 @@ import SwiftUI
 
 struct SettingsView: View {
     @StateObject private var model: SettingsViewModel
-    @State private var showDiscardAlert = false
+    @State private var showResetPromptAlert = false
+    @State private var isRecordingHotkey = false
 
     init(store: SettingsStore) {
         _model = StateObject(wrappedValue: SettingsViewModel(store: store))
@@ -11,6 +12,22 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                HStack {
+                    Text("快捷键")
+                    Spacer()
+                    HotkeyRecorderView(
+                        hotkeyConfig: $model.hotkeyConfig,
+                        isRecording: $isRecordingHotkey
+                    )
+                    .frame(width: 150, height: 28)
+                }
+            } header: {
+                Text("快捷键")
+            } footer: {
+                Text("点击输入框，然后按下想要的快捷键组合（需要至少一个修饰键）")
+            }
+
             Section("历史") {
                 Stepper(value: $model.historyLimit, in: 10...1000, step: 10) {
                     HStack {
@@ -26,42 +43,40 @@ struct SettingsView: View {
                 Toggle("启用润色", isOn: $model.refineEnabled)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("自定义提示词")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    PromptTextView(
-                        text: Binding(
-                            get: { model.refinePromptDraft },
-                            set: { model.updateRefinePromptDraft($0) }
-                        ),
-                        placeholder: RefineService.defaultPrompt
-                    )
-                    .frame(minHeight: 100, maxHeight: 200)
-
-                    if model.refinePromptHasChanges {
-                        HStack {
-                            Spacer()
-                            Button("取消") {
-                                showDiscardAlert = true
-                            }
-                            Button("保存") {
-                                model.saveRefinePrompt()
-                            }
-                            .buttonStyle(.borderedProminent)
+                    HStack {
+                        Text("提示词")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("重置为默认") {
+                            showResetPromptAlert = true
                         }
+                        .font(.caption)
+                        .disabled(model.refinePrompt == RefineService.defaultPrompt)
                     }
+
+                    TextEditor(text: $model.refinePrompt)
+                        .font(.body)
+                        .scrollContentBackground(.hidden)
+                        .background(Color(nsColor: .textBackgroundColor))
+                        .frame(minHeight: 100, maxHeight: 200)
+                        .border(Color(nsColor: .separatorColor), width: 1)
                 }
             } header: {
                 Text("润色")
-            } footer: {
-                Text("留空则使用默认提示词")
-                    .font(.caption)
             }
 
             Section("识别") {
-                TextField("默认语言", text: $model.defaultLanguage)
-                TextField("Whisper 端口", value: $model.whisperPort, format: .number)
+                Picker("默认语言", selection: $model.defaultLanguage) {
+                    Text("自动检测").tag("")
+                    Text("中文").tag("zh")
+                    Text("英语").tag("en")
+                    Text("日语").tag("ja")
+                    Text("韩语").tag("ko")
+                    Text("法语").tag("fr")
+                    Text("德语").tag("de")
+                    Text("西班牙语").tag("es")
+                }
             }
 
             Section("粘贴") {
@@ -106,16 +121,17 @@ struct SettingsView: View {
             } footer: {
                 Text("在触控板上用力按压并保持指定时间即可触发录音，松开后开始转写")
             }
+
         }
         .formStyle(.grouped)
         .padding()
-        .alert("放弃更改？", isPresented: $showDiscardAlert) {
+        .alert("重置提示词？", isPresented: $showResetPromptAlert) {
             Button("取消", role: .cancel) {}
-            Button("放弃", role: .destructive) {
-                model.discardRefinePromptChanges()
+            Button("重置", role: .destructive) {
+                model.resetRefinePrompt()
             }
         } message: {
-            Text("您对提示词的修改尚未保存，确定要放弃吗？")
+            Text("确定要将提示词重置为默认值吗？")
         }
     }
 
@@ -133,98 +149,3 @@ struct SettingsView: View {
     }
 }
 
-// NSTextView wrapper for proper keyboard input support
-struct PromptTextView: NSViewRepresentable {
-    @Binding var text: String
-    var placeholder: String
-
-    func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSTextView.scrollableTextView()
-        let textView = scrollView.documentView as! NSTextView
-
-        textView.delegate = context.coordinator
-        textView.isRichText = false
-        textView.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
-        textView.textColor = .textColor
-        textView.backgroundColor = .textBackgroundColor
-        textView.isEditable = true
-        textView.isSelectable = true
-        textView.allowsUndo = true
-
-        // Enable standard keyboard shortcuts
-        textView.isAutomaticQuoteSubstitutionEnabled = false
-        textView.isAutomaticDashSubstitutionEnabled = false
-
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
-        scrollView.borderType = .bezelBorder
-
-        return scrollView
-    }
-
-    func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        let textView = scrollView.documentView as! NSTextView
-
-        // Show placeholder when text is empty
-        if text.isEmpty {
-            // Only update if not already showing placeholder (avoid re-triggering)
-            if !context.coordinator.isShowingPlaceholder {
-                textView.string = placeholder
-                textView.textColor = .placeholderTextColor
-                context.coordinator.isShowingPlaceholder = true
-            }
-        } else {
-            // Hide placeholder and show actual text
-            if context.coordinator.isShowingPlaceholder {
-                textView.string = text
-                textView.textColor = .textColor
-                context.coordinator.isShowingPlaceholder = false
-            } else if textView.string != text {
-                // Update text only if it differs (avoid cursor jumping)
-                textView.string = text
-            }
-        }
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-
-    @MainActor
-    class Coordinator: NSObject, NSTextViewDelegate {
-        var parent: PromptTextView
-        var isShowingPlaceholder: Bool
-
-        init(_ parent: PromptTextView) {
-            self.parent = parent
-            self.isShowingPlaceholder = parent.text.isEmpty
-        }
-
-        func textDidBeginEditing(_ notification: Notification) {
-            guard let textView = notification.object as? NSTextView else { return }
-
-            // Clear placeholder on focus if showing
-            if isShowingPlaceholder {
-                textView.string = ""
-                textView.textColor = .textColor
-                isShowingPlaceholder = false
-            }
-        }
-
-        func textDidChange(_ notification: Notification) {
-            guard let textView = notification.object as? NSTextView else { return }
-            parent.text = textView.string
-        }
-
-        func textDidEndEditing(_ notification: Notification) {
-            guard let textView = notification.object as? NSTextView else { return }
-
-            // Show placeholder if empty
-            if textView.string.isEmpty {
-                textView.string = parent.placeholder
-                textView.textColor = .placeholderTextColor
-                isShowingPlaceholder = true
-            }
-        }
-    }
-}

@@ -58,8 +58,8 @@ final class SettingsStoreExpandedTests: XCTestCase {
         defaults.removePersistentDomain(forName: "SettingsStoreExpandedTests")
         let store = SettingsStore(userDefaults: defaults)
 
-        // Default is empty string
-        XCTAssertEqual(store.refinePrompt, "")
+        // Default is the system prompt
+        XCTAssertEqual(store.refinePrompt, RefineService.defaultPrompt)
 
         store.refinePrompt = "Custom prompt"
         XCTAssertEqual(store.refinePrompt, "Custom prompt")
@@ -67,19 +67,6 @@ final class SettingsStoreExpandedTests: XCTestCase {
         // Verify it persists by creating a new store with same defaults
         let store2 = SettingsStore(userDefaults: defaults)
         XCTAssertEqual(store2.refinePrompt, "Custom prompt")
-    }
-
-    func testEffectiveRefinePromptUsesDefaultWhenEmpty() {
-        let defaults = UserDefaults(suiteName: "SettingsStoreExpandedTests")!
-        defaults.removePersistentDomain(forName: "SettingsStoreExpandedTests")
-        let store = SettingsStore(userDefaults: defaults)
-
-        // When refinePrompt is empty, effectiveRefinePrompt should return default
-        XCTAssertEqual(store.effectiveRefinePrompt, RefineService.defaultPrompt)
-
-        // When custom prompt is set, effectiveRefinePrompt should return it
-        store.refinePrompt = "Custom prompt"
-        XCTAssertEqual(store.effectiveRefinePrompt, "Custom prompt")
     }
 
     func testPersistsForceTouchEnabled() {
