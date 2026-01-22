@@ -9,13 +9,52 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusItem: NSStatusItem?
     private var floatingPanel: FloatingPanelWindow?
     private var mainWindow: NSWindow?
+    private var downloadWindow: NSWindow?
     let coordinator = AppCoordinator()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if coordinator.downloadManager.isDownloadNeeded() {
+            showDownloadWindow()
+        } else {
+            proceedWithNormalStartup()
+        }
+    }
+
+    private func proceedWithNormalStartup() {
         setupMenuBar()
         setupFloatingPanel()
         checkPermissions()
         coordinator.voiceInputController.start()
+    }
+
+    private func showDownloadWindow() {
+        let downloadView = DownloadView(downloadManager: coordinator.downloadManager) { [weak self] in
+            self?.downloadWindow?.close()
+            self?.downloadWindow = nil
+            self?.proceedWithNormalStartup()
+        }
+
+        let hostingController = NSHostingController(rootView: downloadView)
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Babble Setup"
+        window.contentViewController = hostingController
+        window.isReleasedWhenClosed = false
+        window.center()
+        downloadWindow = window
+
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        // Start the download
+        Task {
+            await coordinator.downloadManager.downloadIfNeeded()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

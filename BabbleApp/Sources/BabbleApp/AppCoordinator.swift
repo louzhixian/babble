@@ -6,12 +6,14 @@ final class AppCoordinator: ObservableObject {
     let settingsStore: SettingsStore
     let mainWindowRouter: MainWindowRouter
     let voiceInputController: VoiceInputController
+    let downloadManager: DownloadManager
     private nonisolated(unsafe) var historyLimitObserver: NSObjectProtocol?
 
     init(settingsStore: SettingsStore = SettingsStore()) {
         self.settingsStore = settingsStore
         self.historyStore = HistoryStore(limit: settingsStore.historyLimit)
         self.mainWindowRouter = MainWindowRouter()
+        self.downloadManager = DownloadManager()
         self.voiceInputController = VoiceInputController(
             historyStore: historyStore,
             settingsStore: settingsStore
