@@ -157,9 +157,16 @@ struct DownloadView: View {
                     NSWorkspace.shared.open(downloadManager.manualDownloadURL)
                 }
                 .buttonStyle(.bordered)
+
+                Button("Check Again") {
+                    Task {
+                        await downloadManager.downloadIfNeeded()
+                    }
+                }
+                .buttonStyle(.bordered)
             }
 
-            Text("Download both whisper-service and whisper-service.sha256,\nthen place them in ~/Library/Application Support/Babble/")
+            Text("Download both whisper-service and whisper-service.sha256,\nthen place them in ~/Library/Application Support/Babble/\nClick \"Check Again\" after placing the files.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
