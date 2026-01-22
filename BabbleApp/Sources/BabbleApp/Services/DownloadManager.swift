@@ -185,6 +185,12 @@ final class DownloadManager: ObservableObject {
             // Files exist, verify checksum in background
             state = .verifying
             if await verifyChecksumAsync() {
+                // Ensure binary is executable (manual downloads may have 0644 permissions)
+                do {
+                    try makeExecutable()
+                } catch {
+                    // Non-fatal: binary might already be executable
+                }
                 state = .completed
                 return
             }
@@ -293,74 +299,45 @@ final class DownloadManager: ObservableObject {
         let url = binaryDownloadURL
         let destinationPath = localBinaryPath
 
-        // Perform download in background to keep UI responsive
-        // Only state updates are dispatched back to main actor
-        try await Task.detached { [session] in
-            let (bytes, response) = try await session.bytes(from: url)
+        state = .downloading(progress: 0, downloadedBytes: 0, totalBytes: 0)
 
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw DownloadError.invalidResponse("Not an HTTP response")
+        // Use URLSessionDownloadTask for efficient large file downloads
+        // This avoids per-byte iteration overhead
+        let delegate = DownloadProgressDelegate { [weak self] progress, downloaded, total in
+            Task { @MainActor in
+                self?.state = .downloading(progress: progress, downloadedBytes: downloaded, totalBytes: total)
             }
+        }
 
-            guard httpResponse.statusCode == 200 else {
-                throw DownloadError.invalidResponse("HTTP \(httpResponse.statusCode)")
-            }
+        let delegateSession = URLSession(
+            configuration: session.configuration,
+            delegate: delegate,
+            delegateQueue: nil
+        )
 
-            let totalBytes = httpResponse.expectedContentLength
-            var downloadedBytes: Int64 = 0
+        defer {
+            delegateSession.invalidateAndCancel()
+        }
 
-            await MainActor.run {
-                self.state = .downloading(progress: 0, downloadedBytes: 0, totalBytes: totalBytes)
-            }
+        // Download to temporary file, then move to destination
+        let (tempURL, response) = try await delegateSession.download(from: url)
 
-            // Use local FileManager instance for thread safety
-            let fm = FileManager.default
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw DownloadError.invalidResponse("Not an HTTP response")
+        }
 
-            // Stream directly to file to avoid loading entire binary into memory
-            // Remove any existing partial download
-            try? fm.removeItem(at: destinationPath)
-            fm.createFile(atPath: destinationPath.path, contents: nil)
+        guard httpResponse.statusCode == 200 else {
+            throw DownloadError.invalidResponse("HTTP \(httpResponse.statusCode)")
+        }
 
-            guard let fileHandle = try? FileHandle(forWritingTo: destinationPath) else {
-                throw DownloadError.fileSystemError("Failed to create file for writing")
-            }
+        // Move downloaded file to destination
+        let fm = FileManager.default
+        try? fm.removeItem(at: destinationPath)
+        try fm.moveItem(at: tempURL, to: destinationPath)
 
-            defer {
-                try? fileHandle.close()
-            }
-
-            // Buffer to accumulate bytes before writing (64KB chunks)
-            let chunkSize = 64 * 1024
-            var buffer = Data()
-            buffer.reserveCapacity(chunkSize)
-
-            for try await byte in bytes {
-                buffer.append(byte)
-                downloadedBytes += 1
-
-                // Write chunk when buffer is full
-                if buffer.count >= chunkSize {
-                    try fileHandle.write(contentsOf: buffer)
-                    buffer.removeAll(keepingCapacity: true)
-
-                    let progress = totalBytes > 0 ? Double(downloadedBytes) / Double(totalBytes) : 0
-                    await MainActor.run {
-                        self.state = .downloading(progress: progress, downloadedBytes: downloadedBytes, totalBytes: totalBytes)
-                    }
-                }
-            }
-
-            // Write any remaining bytes in buffer
-            if !buffer.isEmpty {
-                try fileHandle.write(contentsOf: buffer)
-            }
-
-            // Final progress update
-            let progress = totalBytes > 0 ? Double(downloadedBytes) / Double(totalBytes) : 1.0
-            await MainActor.run {
-                self.state = .downloading(progress: progress, downloadedBytes: downloadedBytes, totalBytes: totalBytes)
-            }
-        }.value
+        // Final progress update
+        let totalBytes = httpResponse.expectedContentLength
+        state = .downloading(progress: 1.0, downloadedBytes: totalBytes, totalBytes: totalBytes)
     }
 
     private func computeChecksum(for url: URL) throws -> String {
@@ -412,5 +389,38 @@ final class DownloadManager: ObservableObject {
         } catch {
             throw DownloadError.fileSystemError("Failed to make binary executable: \(error.localizedDescription)")
         }
+    }
+}
+
+// MARK: - Download Progress Delegate
+
+/// Delegate for tracking download progress with URLSessionDownloadTask
+private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
+    private let onProgress: @Sendable (Double, Int64, Int64) -> Void
+
+    init(onProgress: @escaping @Sendable (Double, Int64, Int64) -> Void) {
+        self.onProgress = onProgress
+        super.init()
+    }
+
+    func urlSession(
+        _: URLSession,
+        downloadTask _: URLSessionDownloadTask,
+        didWriteData _: Int64,
+        totalBytesWritten: Int64,
+        totalBytesExpectedToWrite: Int64
+    ) {
+        let progress = totalBytesExpectedToWrite > 0
+            ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+            : 0
+        onProgress(progress, totalBytesWritten, totalBytesExpectedToWrite)
+    }
+
+    func urlSession(
+        _: URLSession,
+        downloadTask _: URLSessionDownloadTask,
+        didFinishDownloadingTo _: URL
+    ) {
+        // File handling is done in the async download completion
     }
 }

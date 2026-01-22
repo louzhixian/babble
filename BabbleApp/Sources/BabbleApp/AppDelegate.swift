@@ -16,11 +16,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Ensure app shows in Dock (Info.plist LSUIElement is ignored by swift run)
         NSApp.setActivationPolicy(.regular)
 
-        if coordinator.downloadManager.isDownloadNeeded() {
-            showDownloadWindow()
-        } else {
-            proceedWithNormalStartup()
-        }
+        // Always verify/download - downloadIfNeeded() handles both cases:
+        // - Missing files: shows download UI
+        // - Existing files: verifies checksum in background, re-downloads if corrupt
+        showDownloadWindow()
     }
 
     private func proceedWithNormalStartup() {
