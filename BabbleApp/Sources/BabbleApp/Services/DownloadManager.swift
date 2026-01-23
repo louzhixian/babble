@@ -336,7 +336,9 @@ final class DownloadManager: ObservableObject {
 
         // First, get the actual file size via HEAD request (following redirects)
         // GitHub releases redirect to a CDN, and the original URL doesn't have Content-Length
+        print("DownloadManager: Starting download from \(url)")
         let expectedSize = await getFileSizeViaHead(url: url)
+        print("DownloadManager: Expected file size: \(expectedSize)")
 
         // Use URLSessionDownloadTask for efficient large file downloads
         // This avoids per-byte iteration overhead
@@ -451,10 +453,12 @@ final class DownloadManager: ObservableObject {
         do {
             let (_, response) = try await headSession.data(for: request)
             if let httpResponse = response as? HTTPURLResponse {
-                return httpResponse.expectedContentLength
+                let size = httpResponse.expectedContentLength
+                print("DownloadManager: HEAD request returned size: \(size) bytes")
+                return size
             }
         } catch {
-            // Ignore errors, will fall back to unknown size
+            print("DownloadManager: HEAD request failed: \(error)")
         }
         return -1
     }
@@ -472,6 +476,7 @@ private final class HeadRequestDelegate: NSObject, URLSessionTaskDelegate {
         completionHandler: @escaping (URLRequest?) -> Void
     ) {
         // Follow the redirect but keep it as HEAD
+        print("HeadRequestDelegate: Redirecting to \(request.url?.absoluteString ?? "nil")")
         var newRequest = request
         newRequest.httpMethod = "HEAD"
         completionHandler(newRequest)
@@ -491,6 +496,7 @@ private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelega
         self.expectedSize = expectedSize
         self.onProgress = onProgress
         super.init()
+        print("DownloadProgressDelegate: initialized with expectedSize=\(expectedSize)")
     }
 
     func urlSession(
