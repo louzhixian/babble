@@ -42,12 +42,13 @@ jobs:
           cp Info.plist "$CONTENTS_DIR/"
           cp Resources/AppIcon.icns "$RESOURCES_DIR/"
 
-          # Ad-hoc sign the app (prevents "damaged" warning)
-          codesign --force --deep --sign - "$APP_DIR"
+          # Ad-hoc sign with hardened runtime
+          codesign --force --deep --options runtime --sign - "$APP_DIR"
 
-          # Create zip for release
+          # Remove quarantine attribute and create zip
           cd .build
-          zip -r Babble-${{ github.ref_name }}.zip Babble.app
+          xattr -cr Babble.app
+          ditto -c -k --keepParent Babble.app Babble-${{ github.ref_name }}.zip
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

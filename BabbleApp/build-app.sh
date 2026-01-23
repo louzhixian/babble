@@ -32,8 +32,8 @@ cp Info.plist "$CONTENTS_DIR/"
 # Copy app icon
 cp Resources/AppIcon.icns "$RESOURCES_DIR/"
 
-# Ad-hoc sign the app (prevents "damaged" warning on other Macs)
-codesign --force --deep --sign - "$APP_DIR"
+# Ad-hoc sign with hardened runtime (prevents "damaged" warning)
+codesign --force --deep --options runtime --sign - "$APP_DIR"
 
 echo ""
 echo "Built Babble.app at $APP_DIR"
