@@ -65,8 +65,13 @@ actor WhisperProcessManager {
 
         guard !isRunning else { return }
 
-        // Check if service is already running externally
+        // Kill any stale whisper-service processes before starting
+        // This ensures we always run the latest downloaded binary
+        await killStaleProcesses()
+
+        // Check if service is already running (shouldn't be after killing stale processes)
         if await checkHealth() {
+            print("ProcessManager: Service already running on port \(port)")
             isRunning = true
             return
         }
@@ -75,6 +80,7 @@ actor WhisperProcessManager {
             throw ProcessManagerError.binaryNotInstalled(binaryPath.path)
         }
 
+        print("ProcessManager: Starting binary at \(binaryPath.path)")
         let process = Process()
         process.executableURL = binaryPath
         var environment = ProcessInfo.processInfo.environment
@@ -134,6 +140,42 @@ actor WhisperProcessManager {
         process?.terminate()
         process = nil
         isRunning = false
+    }
+
+    /// Kill any stale whisper-service processes that weren't started by this ProcessManager
+    /// This ensures we always use the latest downloaded binary
+    private func killStaleProcesses() async {
+        // Use specific pattern to avoid killing unrelated processes
+        // Match only processes running from our Application Support directory
+        let targetPattern = binaryPath.path
+
+        // Run blocking pkill in detached task to avoid blocking the actor
+        await Task.detached {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+            task.arguments = ["-f", targetPattern]
+            task.standardOutput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+
+            do {
+                try task.run()
+                task.waitUntilExit()
+
+                let exitCode = task.terminationStatus
+                if exitCode == 0 {
+                    print("ProcessManager: Killed stale whisper-service processes")
+                } else if exitCode == 1 {
+                    print("ProcessManager: No stale whisper-service processes found")
+                } else {
+                    print("ProcessManager: pkill returned unexpected exit code: \(exitCode)")
+                }
+            } catch {
+                print("ProcessManager: pkill failed to launch: \(error)")
+            }
+        }.value
+
+        // Wait for processes to fully terminate
+        try? await Task.sleep(nanoseconds: 500_000_000)
     }
 
     func ensureRunning() async throws {
