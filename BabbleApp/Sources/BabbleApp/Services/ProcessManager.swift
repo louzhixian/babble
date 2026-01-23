@@ -145,6 +145,34 @@ actor WhisperProcessManager {
     var running: Bool {
         isRunning && (process?.isRunning ?? false)
     }
+
+    /// Preload the model (downloads if not cached, loads into memory)
+    /// Call this after start() to ensure model is ready before first use
+    func warmup() async throws {
+        try await ensureRunning()
+
+        let warmupURL = URL(string: "http://\(host):\(port)/warmup")!
+        var request = URLRequest(url: warmupURL)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 600  // 10 minutes for model download
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw ProcessManagerError.startFailed("Failed to warmup model")
+        }
+
+        // Parse response to check status
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let status = json["status"] as? String {
+            if status == "loaded" || status == "already_loaded" {
+                return
+            }
+        }
+
+        throw ProcessManagerError.startFailed("Unexpected warmup response")
+    }
 }
 
 enum ProcessManagerError: Error, LocalizedError {

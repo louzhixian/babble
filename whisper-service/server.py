@@ -34,7 +34,24 @@ async def health_check():
     return {
         "status": "ready",
         "model": config["model"]["name"],
+        "model_loaded": transcriber.is_loaded,
     }
+
+
+@app.post("/warmup")
+async def warmup():
+    """
+    Preload the model by running a minimal transcription.
+    This triggers model download if not cached, and loads it into memory.
+    Returns immediately if model is already loaded.
+    """
+    if transcriber.is_loaded:
+        return {"status": "already_loaded", "model": config["model"]["name"]}
+
+    # Trigger model loading by calling ensure_loaded which does actual loading
+    transcriber.load_model()
+
+    return {"status": "loaded", "model": config["model"]["name"]}
 
 
 @app.post("/transcribe")

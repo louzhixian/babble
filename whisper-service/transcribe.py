@@ -15,11 +15,53 @@ class Transcriber:
         self._model_loaded = False
         self._last_used: float = 0
 
+    @property
+    def is_loaded(self) -> bool:
+        """Check if model is loaded."""
+        return self._model_loaded
+
+    def load_model(self) -> None:
+        """
+        Explicitly load the model (downloads if not cached).
+        This is a blocking operation that may take a while on first run.
+        """
+        if self._model_loaded:
+            return
+
+        # mlx_whisper.transcribe will download and load the model
+        # We use a minimal audio to trigger this
+        import tempfile
+        import numpy as np
+
+        # Create a minimal silent audio file (16kHz, 0.1 seconds)
+        sample_rate = 16000
+        duration = 0.1
+        samples = int(sample_rate * duration)
+        silent_audio = np.zeros(samples, dtype=np.float32)
+
+        # Write to temp file
+        import soundfile as sf
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            sf.write(tmp.name, silent_audio, sample_rate)
+            tmp_path = tmp.name
+
+        try:
+            # This triggers model download and loading
+            mlx_whisper.transcribe(
+                tmp_path,
+                path_or_hf_repo=self.model_name,
+                language="en",
+            )
+            self._model_loaded = True
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+        self._last_used = time.time()
+
     def ensure_loaded(self) -> None:
         """Ensure model is loaded (lazy loading on first use)."""
         if not self._model_loaded:
-            # mlx_whisper loads model on first transcribe call
-            self._model_loaded = True
+            self.load_model()
         self._last_used = time.time()
 
     def transcribe(

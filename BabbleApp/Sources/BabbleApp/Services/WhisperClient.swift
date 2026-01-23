@@ -25,6 +25,18 @@ struct TranscriptionResult: Codable {
 struct HealthResponse: Codable {
     let status: String
     let model: String
+    let modelLoaded: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case model
+        case modelLoaded = "model_loaded"
+    }
+}
+
+struct WarmupResponse: Codable {
+    let status: String
+    let model: String
 }
 
 enum WhisperClientError: Error, LocalizedError {
@@ -63,6 +75,24 @@ actor WhisperClient {
         }
 
         return try JSONDecoder().decode(HealthResponse.self, from: data)
+    }
+
+    /// Trigger model preloading (downloads if not cached, loads into memory)
+    /// This may take a while on first run (~1.5GB download)
+    func warmup() async throws -> WarmupResponse {
+        let url = baseURL.appendingPathComponent("warmup")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 600  // 10 minutes for model download
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw WhisperClientError.serverNotRunning
+        }
+
+        return try JSONDecoder().decode(WarmupResponse.self, from: data)
     }
 
     func transcribe(audioURL: URL, language: String? = nil) async throws -> TranscriptionResult {

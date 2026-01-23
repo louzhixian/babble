@@ -259,6 +259,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 guard let self else { return }
                 self.coordinator.voiceInputController.start()
             },
+            warmupModel: { [weak self] in
+                // Preload the speech model (downloads if not cached)
+                guard let self else { return }
+                try await self.coordinator.voiceInputController.warmupModel()
+            },
             onComplete: { [weak self] in
                 self?.setupWindow?.close()
                 self?.setupWindow = nil

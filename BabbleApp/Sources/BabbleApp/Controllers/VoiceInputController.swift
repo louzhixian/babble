@@ -90,6 +90,12 @@ class VoiceInputController: NSObject, ObservableObject {
         }
     }
 
+    /// Preload the speech model (downloads if not cached, loads into memory)
+    /// Call this during setup to ensure model is ready before first use
+    func warmupModel() async throws {
+        try await processManager.warmup()
+    }
+
     deinit {
         NotificationCenter.default.removeObserver(self)
     }

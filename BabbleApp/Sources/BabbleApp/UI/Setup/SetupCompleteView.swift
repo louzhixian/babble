@@ -7,12 +7,14 @@ struct SetupCompleteView: View {
     enum SetupState {
         case permissionsGranted
         case startingService
+        case loadingModel
         case serviceError(String)
         case ready
     }
 
     @State private var state: SetupState = .permissionsGranted
     var startService: () async throws -> Void
+    var warmupModel: () async throws -> Void
     var onComplete: () -> Void
 
     var body: some View {
@@ -45,6 +47,9 @@ struct SetupCompleteView: View {
         case .startingService:
             Image(systemName: "cpu.fill")
                 .foregroundStyle(.blue)
+        case .loadingModel:
+            Image(systemName: "arrow.down.circle.fill")
+                .foregroundStyle(.blue)
         case .serviceError:
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
@@ -62,6 +67,8 @@ struct SetupCompleteView: View {
             return "Permissions Granted!"
         case .startingService:
             return "Starting Speech Service..."
+        case .loadingModel:
+            return "Loading Speech Model..."
         case .serviceError:
             return "Service Error"
         case .ready:
@@ -78,6 +85,8 @@ struct SetupCompleteView: View {
             permissionsGrantedContent
         case .startingService:
             startingServiceContent
+        case .loadingModel:
+            loadingModelContent
         case .serviceError(let message):
             serviceErrorContent(message: message)
         case .ready:
@@ -100,21 +109,32 @@ struct SetupCompleteView: View {
                 .multilineTextAlignment(.center)
 
             Button("Continue") {
-                state = .startingService
-                Task {
-                    do {
-                        try await startService()
-                        await MainActor.run {
-                            state = .ready
-                        }
-                    } catch {
-                        await MainActor.run {
-                            state = .serviceError(error.localizedDescription)
-                        }
-                    }
-                }
+                startSetup()
             }
             .buttonStyle(.borderedProminent)
+        }
+    }
+
+    private func startSetup() {
+        state = .startingService
+        Task {
+            do {
+                // Step 1: Start the service
+                try await startService()
+                await MainActor.run {
+                    state = .loadingModel
+                }
+
+                // Step 2: Warmup (download and load model)
+                try await warmupModel()
+                await MainActor.run {
+                    state = .ready
+                }
+            } catch {
+                await MainActor.run {
+                    state = .serviceError(error.localizedDescription)
+                }
+            }
         }
     }
 
@@ -130,6 +150,21 @@ struct SetupCompleteView: View {
         }
     }
 
+    // MARK: - Loading Model Content
+
+    private var loadingModelContent: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.regular)
+            Text("Downloading and loading speech model...")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("This may take a few minutes on first launch (~1.5GB)")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
     // MARK: - Service Error Content
 
     private func serviceErrorContent(message: String) -> some View {
@@ -140,19 +175,7 @@ struct SetupCompleteView: View {
                 .multilineTextAlignment(.center)
 
             Button("Retry") {
-                state = .startingService
-                Task {
-                    do {
-                        try await startService()
-                        await MainActor.run {
-                            state = .ready
-                        }
-                    } catch {
-                        await MainActor.run {
-                            state = .serviceError(error.localizedDescription)
-                        }
-                    }
-                }
+                startSetup()
             }
             .buttonStyle(.borderedProminent)
         }
@@ -196,11 +219,6 @@ struct SetupCompleteView: View {
                 }
             }
             .padding(.vertical, 8)
-
-            Text("The speech model (~1.5GB) will download automatically on first use.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
 
             Button("Start Using Babble") {
                 onComplete()

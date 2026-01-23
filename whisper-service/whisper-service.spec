@@ -44,6 +44,8 @@ a = Analysis(
         'uvicorn.lifespan.on',
         'uvicorn.server',
         'uvicorn.config',
+        'soundfile',
+        'numpy',
     ] + mlx_hiddenimports,
     hookspath=[],
     hooksconfig={},
