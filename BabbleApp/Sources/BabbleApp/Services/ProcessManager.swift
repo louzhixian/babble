@@ -71,7 +71,7 @@ actor WhisperProcessManager {
 
         // Check if service is already running (shouldn't be after killing stale processes)
         if await checkHealth() {
-            print("ProcessManager: Service already running on port \(port)")
+            Log.process.debug("Service already running on port \(self.port)")
             isRunning = true
             return
         }
@@ -80,7 +80,7 @@ actor WhisperProcessManager {
             throw ProcessManagerError.binaryNotInstalled(binaryPath.path)
         }
 
-        print("ProcessManager: Starting binary at \(binaryPath.path)")
+        Log.process.info("Starting binary at \(self.binaryPath.path)")
         let process = Process()
         process.executableURL = binaryPath
         var environment = ProcessInfo.processInfo.environment
@@ -163,14 +163,14 @@ actor WhisperProcessManager {
 
                 let exitCode = task.terminationStatus
                 if exitCode == 0 {
-                    print("ProcessManager: Killed stale whisper-service processes")
+                    Log.process.debug("Killed stale whisper-service processes")
                 } else if exitCode == 1 {
-                    print("ProcessManager: No stale whisper-service processes found")
+                    Log.process.debug("No stale whisper-service processes found")
                 } else {
-                    print("ProcessManager: pkill returned unexpected exit code: \(exitCode)")
+                    Log.process.warning("pkill returned unexpected exit code: \(exitCode)")
                 }
             } catch {
-                print("ProcessManager: pkill failed to launch: \(error)")
+                Log.process.error("pkill failed to launch: \(error.localizedDescription)")
             }
         }.value
 
@@ -191,9 +191,9 @@ actor WhisperProcessManager {
     /// Preload the model (downloads if not cached, loads into memory)
     /// Call this after start() to ensure model is ready before first use
     func warmup() async throws {
-        print("ProcessManager: warmup() called, ensuring service is running...")
+        Log.process.debug("warmup() called, ensuring service is running...")
         try await ensureRunning()
-        print("ProcessManager: service is running, calling warmup endpoint...")
+        Log.process.debug("Service is running, calling warmup endpoint...")
 
         // Use a dedicated session with long timeout for model download
         let warmupConfig = URLSessionConfiguration.default
@@ -206,20 +206,20 @@ actor WhisperProcessManager {
         var request = URLRequest(url: warmupURL)
         request.httpMethod = "POST"
 
-        print("ProcessManager: POST \(warmupURL)")
+        Log.process.debug("POST \(warmupURL)")
 
         do {
             let (data, response) = try await warmupSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("ProcessManager: warmup - not an HTTP response")
+                Log.process.error("Warmup: not an HTTP response")
                 throw ProcessManagerError.startFailed("Warmup: not an HTTP response")
             }
 
-            print("ProcessManager: warmup response status: \(httpResponse.statusCode)")
+            Log.process.debug("Warmup response status: \(httpResponse.statusCode)")
 
             let bodyStr = String(data: data, encoding: .utf8) ?? "no body"
-            print("ProcessManager: warmup response body: \(bodyStr)")
+            Log.process.debug("Warmup response body: \(bodyStr)")
 
             guard httpResponse.statusCode == 200 else {
                 throw ProcessManagerError.startFailed("Warmup failed with HTTP \(httpResponse.statusCode): \(bodyStr)")
@@ -228,7 +228,7 @@ actor WhisperProcessManager {
             // Parse response to check status
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let status = json["status"] as? String {
-                print("ProcessManager: warmup status: \(status)")
+                Log.process.info("Warmup status: \(status)")
                 if status == "loaded" || status == "already_loaded" {
                     return
                 }
@@ -238,13 +238,13 @@ actor WhisperProcessManager {
         } catch let error as ProcessManagerError {
             throw error
         } catch let urlError as URLError {
-            print("ProcessManager: warmup URLError: \(urlError.code.rawValue) - \(urlError.localizedDescription)")
+            Log.process.error("Warmup URLError: \(urlError.code.rawValue) - \(urlError.localizedDescription)")
             if urlError.code == .timedOut {
                 throw ProcessManagerError.startFailed("Warmup timed out - model download may still be in progress")
             }
             throw ProcessManagerError.startFailed("Warmup request failed: \(urlError.localizedDescription)")
         } catch {
-            print("ProcessManager: warmup error: \(error)")
+            Log.process.error("Warmup error: \(error.localizedDescription)")
             throw ProcessManagerError.startFailed("Warmup request failed: \(error.localizedDescription)")
         }
     }

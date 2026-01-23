@@ -18,6 +18,7 @@ final class SettingsStore: ObservableObject {
     private let forceTouchHoldSecondsKey = "forceTouchHoldSeconds"
     private let hotkeyKeyCodeKey = "hotkeyKeyCode"
     private let hotkeyModifiersKey = "hotkeyModifiers"
+    private let appLanguageKey = "appLanguage"
 
     init(userDefaults: UserDefaults = .standard) {
         self.defaults = userDefaults
@@ -27,7 +28,7 @@ final class SettingsStore: ObservableObject {
         get {
             guard let raw = defaults.string(forKey: positionKey),
                   let value = FloatingPanelPosition(rawValue: raw) else {
-                return .top
+                return .bottom
             }
             return value
         }
@@ -119,7 +120,7 @@ final class SettingsStore: ObservableObject {
     }
 
     var forceTouchEnabled: Bool {
-        get { defaults.object(forKey: forceTouchEnabledKey) as? Bool ?? false }
+        get { defaults.object(forKey: forceTouchEnabledKey) as? Bool ?? true }
         set {
             defaults.set(newValue, forKey: forceTouchEnabledKey)
             NotificationCenter.default.post(name: .settingsForceTouchDidChange, object: self)
@@ -129,7 +130,7 @@ final class SettingsStore: ObservableObject {
     var forceTouchHoldSeconds: Double {
         get {
             let stored = defaults.double(forKey: forceTouchHoldSecondsKey)
-            return stored > 0 ? stored : 2.0
+            return stored > 0 ? stored : 1.5
         }
         set {
             defaults.set(newValue, forKey: forceTouchHoldSecondsKey)
@@ -175,6 +176,21 @@ final class SettingsStore: ObservableObject {
             defaults.set(Int(newValue.keyCode), forKey: hotkeyKeyCodeKey)
             defaults.set(Int(newValue.modifiers), forKey: hotkeyModifiersKey)
             NotificationCenter.default.post(name: .settingsHotkeyDidChange, object: self)
+        }
+    }
+
+    var appLanguage: AppLanguage {
+        get {
+            guard let raw = defaults.string(forKey: appLanguageKey),
+                  let value = AppLanguage(rawValue: raw) else {
+                return .system
+            }
+            return value
+        }
+        set {
+            objectWillChange.send()
+            defaults.set(newValue.rawValue, forKey: appLanguageKey)
+            NotificationCenter.default.post(name: .settingsLanguageDidChange, object: self)
         }
     }
 }
@@ -312,4 +328,5 @@ extension Notification.Name {
     static let settingsForceTouchDidChange = Notification.Name("SettingsStore.forceTouchDidChange")
     static let settingsHotkeyDidChange = Notification.Name("SettingsStore.hotkeyDidChange")
     static let settingsWhisperPortDidChange = Notification.Name("SettingsStore.whisperPortDidChange")
+    static let settingsLanguageDidChange = Notification.Name("SettingsStore.languageDidChange")
 }

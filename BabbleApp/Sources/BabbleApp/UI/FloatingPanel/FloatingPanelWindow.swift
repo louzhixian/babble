@@ -25,7 +25,7 @@ class FloatingPanelWindow: NSPanel {
         backgroundColor = .clear
         hasShadow = false
 
-        let hostingView = NSHostingView(rootView: FloatingPanelView(controller: controller))
+        let hostingView = NSHostingView(rootView: FloatingPanelView(controller: controller, settingsStore: settingsStore))
         contentView = hostingView
 
         updateFrame()

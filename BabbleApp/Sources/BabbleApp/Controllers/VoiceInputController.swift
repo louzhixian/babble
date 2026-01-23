@@ -352,7 +352,7 @@ class VoiceInputController: NSObject, ObservableObject {
                     )
                 } catch {
                     // Refinement failed (e.g., AFM not available), use raw transcription
-                    print("Refinement failed, using raw transcription: \(error.localizedDescription)")
+                    Log.general.warning("Refinement failed, using raw transcription: \(error.localizedDescription)")
                 }
             }
 

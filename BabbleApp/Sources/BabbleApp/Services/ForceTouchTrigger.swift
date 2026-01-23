@@ -76,7 +76,7 @@ final class ForceTouchTrigger {
         )
 
         guard let eventTap = eventTap else {
-            print("ForceTouchTrigger: Failed to create event tap. Check Accessibility permissions.")
+            Log.hotkey.error("ForceTouchTrigger: Failed to create event tap. Check Accessibility permissions.")
             return
         }
 

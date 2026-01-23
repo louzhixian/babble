@@ -5,6 +5,11 @@ import SwiftUI
 
 struct FloatingPanelView: View {
     @ObservedObject var controller: VoiceInputController
+    let settingsStore: SettingsStore
+
+    private var l: LocalizedStrings {
+        L10n.strings(for: settingsStore.appLanguage)
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -64,15 +69,15 @@ struct FloatingPanelView: View {
     private var statusText: String {
         switch controller.panelState.status {
         case .idle:
-            return "Ready"
+            return l.ready
         case .recording:
-            return "Recording..."
+            return l.recording
         case .processing:
-            return "Processing..."
+            return l.processing
         case .pasteFailed:
-            return controller.panelState.message ?? "你可以在目标位置粘贴"
+            return controller.panelState.message ?? l.pasteManually
         case .error:
-            return controller.panelState.message ?? "Something went wrong"
+            return controller.panelState.message ?? l.somethingWentWrong
         }
     }
 

@@ -67,7 +67,7 @@ class HotkeyManager: ObservableObject {
         )
 
         guard let eventTap = eventTap else {
-            print("Failed to create event tap. Make sure Accessibility permission is granted.")
+            Log.hotkey.error("Failed to create event tap. Make sure Accessibility permission is granted.")
             return
         }
 

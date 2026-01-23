@@ -146,7 +146,7 @@ final class DownloadManager: ObservableObject {
 
         // First check if binary exists locally
         guard fileManager.fileExists(atPath: binaryPath.path) else {
-            print("DownloadManager: Binary not found at \(binaryPath.path)")
+            Log.download.debug("Binary not found at \(binaryPath.path)")
             return false
         }
 
@@ -155,15 +155,15 @@ final class DownloadManager: ObservableObject {
         let remoteChecksum: String
         do {
             remoteChecksum = try await downloadChecksum()
-            print("DownloadManager: Remote checksum: \(remoteChecksum)")
+            Log.download.debug("Remote checksum: \(remoteChecksum)")
         } catch {
-            print("DownloadManager: Failed to fetch remote checksum: \(error)")
+            Log.download.warning("Failed to fetch remote checksum: \(error.localizedDescription)")
             // Network failure - fall back to local validation if available
             // This prevents unnecessary re-downloads during offline usage
             if let localStoredChecksum = try? loadStoredChecksum() {
                 if let localChecksum = try? await computeChecksumAsync(for: binaryPath),
                    localChecksum == localStoredChecksum {
-                    print("DownloadManager: Network unavailable but local checksum valid")
+                    Log.download.info("Network unavailable but local checksum valid")
                     return true
                 }
             }
@@ -174,14 +174,14 @@ final class DownloadManager: ObservableObject {
         let localChecksum: String
         do {
             localChecksum = try await computeChecksumAsync(for: binaryPath)
-            print("DownloadManager: Local checksum: \(localChecksum)")
+            Log.download.debug("Local checksum: \(localChecksum)")
         } catch {
-            print("DownloadManager: Failed to compute local checksum: \(error)")
+            Log.download.error("Failed to compute local checksum: \(error.localizedDescription)")
             return false
         }
 
         let matches = remoteChecksum.lowercased() == localChecksum.lowercased()
-        print("DownloadManager: Checksum match: \(matches)")
+        Log.download.info("Checksum match: \(matches)")
         return matches
     }
 
@@ -340,9 +340,9 @@ final class DownloadManager: ObservableObject {
         state = .downloading(progress: 0, downloadedBytes: 0, totalBytes: 0)
 
         // First, get the actual file size via range request
-        print("DownloadManager: Starting download from \(url)")
+        Log.download.info("Starting download from \(url)")
         let expectedSize = await getFileSizeViaHead(url: url)
-        print("DownloadManager: Expected file size: \(expectedSize)")
+        Log.download.debug("Expected file size: \(expectedSize)")
 
         // Create a download delegate that handles both progress and completion
         let downloadDelegate = FullDownloadDelegate(
@@ -367,7 +367,7 @@ final class DownloadManager: ObservableObject {
 
         // Start download task WITHOUT completion handler so delegate methods are called
         let task = downloadSession.downloadTask(with: url)
-        print("DownloadManager: Starting download task")
+        Log.download.debug("Starting download task")
         task.resume()
 
         // Wait for completion via delegate
@@ -381,7 +381,7 @@ final class DownloadManager: ObservableObject {
             throw DownloadError.invalidResponse("HTTP \(httpResponse.statusCode)")
         }
 
-        print("DownloadManager: Download complete, moving to destination")
+        Log.download.info("Download complete, moving to destination")
 
         // Move downloaded file to destination
         let fm = FileManager.default
@@ -451,7 +451,7 @@ final class DownloadManager: ObservableObject {
     /// Get file size using a range request which is more reliable than HEAD for CDN URLs
     /// Range request returns Content-Range header with total file size
     private func getFileSizeViaHead(url: URL) async -> Int64 {
-        print("DownloadManager: Getting file size for \(url)")
+        Log.download.debug("Getting file size for \(url)")
 
         // Use range request - more reliable than HEAD for GitHub CDN
         // Range: bytes=0-0 returns first byte and Content-Range: bytes 0-0/TOTAL_SIZE
@@ -464,14 +464,14 @@ final class DownloadManager: ObservableObject {
             // URLSession follows redirects automatically for GET requests
             let (_, response) = try await session.data(for: rangeRequest)
             if let httpResponse = response as? HTTPURLResponse {
-                print("DownloadManager: Range response status: \(httpResponse.statusCode)")
+                Log.download.debug("Range response status: \(httpResponse.statusCode)")
 
                 // Check Content-Range header: "bytes 0-0/229615504"
                 if let contentRange = httpResponse.value(forHTTPHeaderField: "Content-Range") {
-                    print("DownloadManager: Content-Range: \(contentRange)")
+                    Log.download.debug("Content-Range: \(contentRange)")
                     if let slashIndex = contentRange.lastIndex(of: "/"),
                        let size = Int64(contentRange[contentRange.index(after: slashIndex)...]) {
-                        print("DownloadManager: File size from range request: \(size)")
+                        Log.download.debug("File size from range request: \(size)")
                         return size
                     }
                 }
@@ -479,15 +479,15 @@ final class DownloadManager: ObservableObject {
                 // Fallback to Content-Length if available
                 let size = httpResponse.expectedContentLength
                 if size > 0 {
-                    print("DownloadManager: File size from Content-Length: \(size)")
+                    Log.download.debug("File size from Content-Length: \(size)")
                     return size
                 }
             }
         } catch {
-            print("DownloadManager: Range request failed: \(error)")
+            Log.download.warning("Range request failed: \(error.localizedDescription)")
         }
 
-        print("DownloadManager: Could not determine file size")
+        Log.download.warning("Could not determine file size")
         return -1
     }
 }
@@ -509,7 +509,7 @@ private final class FullDownloadDelegate: NSObject, URLSessionDownloadDelegate, 
         self.expectedSize = expectedSize
         self.onProgress = onProgress
         super.init()
-        print("FullDownloadDelegate: initialized with expectedSize=\(expectedSize)")
+        Log.download.debug("Download delegate initialized with expectedSize=\(expectedSize)")
     }
 
     /// Wait for the download to complete
@@ -536,7 +536,7 @@ private final class FullDownloadDelegate: NSObject, URLSessionDownloadDelegate, 
         lock.unlock()
 
         if isFirst {
-            print("FullDownloadDelegate: first progress callback - written=\(totalBytesWritten), expected=\(totalBytesExpectedToWrite)")
+            Log.download.debug("First progress callback - written=\(totalBytesWritten), expected=\(totalBytesExpectedToWrite)")
         }
 
         // Throttle updates to avoid overwhelming the main thread
@@ -555,7 +555,7 @@ private final class FullDownloadDelegate: NSObject, URLSessionDownloadDelegate, 
         let progress = totalBytes > 0
             ? Double(totalBytesWritten) / Double(totalBytes)
             : 0
-        print("FullDownloadDelegate: progress=\(Int(progress * 100))%, written=\(totalBytesWritten), total=\(totalBytes)")
+        Log.download.debug("Progress: \(Int(progress * 100))%, written=\(totalBytesWritten), total=\(totalBytes)")
         onProgress(progress, totalBytesWritten, totalBytes)
     }
 
@@ -564,7 +564,7 @@ private final class FullDownloadDelegate: NSObject, URLSessionDownloadDelegate, 
         downloadTask: URLSessionDownloadTask,
         didFinishDownloadingTo location: URL
     ) {
-        print("FullDownloadDelegate: download finished to \(location.path)")
+        Log.download.info("Download finished to \(location.path)")
 
         // Copy the file to a permanent location before this method returns
         // (the file at 'location' is deleted after this method returns)
@@ -578,7 +578,7 @@ private final class FullDownloadDelegate: NSObject, URLSessionDownloadDelegate, 
             _response = downloadTask.response
             lock.unlock()
         } catch {
-            print("FullDownloadDelegate: failed to copy downloaded file: \(error)")
+            Log.download.error("Failed to copy downloaded file: \(error.localizedDescription)")
         }
     }
 
@@ -595,13 +595,13 @@ private final class FullDownloadDelegate: NSObject, URLSessionDownloadDelegate, 
         lock.unlock()
 
         if let error = error {
-            print("FullDownloadDelegate: completed with error: \(error)")
+            Log.download.error("Download completed with error: \(error.localizedDescription)")
             continuation?.resume(throwing: error)
         } else if let fileURL = fileURL, let response = response {
-            print("FullDownloadDelegate: completed successfully")
+            Log.download.info("Download completed successfully")
             continuation?.resume(returning: (fileURL, response))
         } else {
-            print("FullDownloadDelegate: completed but no file URL or response")
+            Log.download.error("Download completed but no file URL or response")
             continuation?.resume(throwing: DownloadError.invalidResponse("Download completed but no file or response"))
         }
     }

@@ -10,11 +10,25 @@ struct SettingsView: View {
         _model = StateObject(wrappedValue: SettingsViewModel(store: store))
     }
 
+    private var l: LocalizedStrings {
+        L10n.strings(for: model.appLanguage)
+    }
+
     var body: some View {
         Form {
             Section {
+                Picker(l.appLanguage, selection: $model.appLanguage) {
+                    ForEach(AppLanguage.allCases, id: \.self) { lang in
+                        Text(lang.displayName).tag(lang)
+                    }
+                }
+            } header: {
+                Text(l.appLanguageSection)
+            }
+
+            Section {
                 HStack {
-                    Text("快捷键")
+                    Text(l.hotkey)
                     Spacer()
                     HotkeyRecorderView(
                         hotkeyConfig: $model.hotkeyConfig,
@@ -23,15 +37,15 @@ struct SettingsView: View {
                     .frame(width: 150, height: 28)
                 }
             } header: {
-                Text("快捷键")
+                Text(l.hotkey)
             } footer: {
-                Text("点击输入框，然后按下想要的快捷键组合（需要至少一个修饰键）")
+                Text(l.hotkeyHint)
             }
 
-            Section("历史") {
+            Section(l.historySection) {
                 Stepper(value: $model.historyLimit, in: 10...1000, step: 10) {
                     HStack {
-                        Text("保留条数")
+                        Text(l.historyLimit)
                         Spacer()
                         Text("\(model.historyLimit)")
                             .foregroundStyle(.secondary)
@@ -40,15 +54,15 @@ struct SettingsView: View {
             }
 
             Section {
-                Toggle("启用润色", isOn: $model.refineEnabled)
+                Toggle(l.refineEnabled, isOn: $model.refineEnabled)
 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("提示词")
+                        Text(l.refinePrompt)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Button("重置为默认") {
+                        Button(l.resetToDefault) {
                             showResetPromptAlert = true
                         }
                         .font(.caption)
@@ -63,89 +77,88 @@ struct SettingsView: View {
                         .border(Color(nsColor: .separatorColor), width: 1)
                 }
             } header: {
-                Text("润色")
+                Text(l.refineSection)
             }
 
-            Section("识别") {
-                Picker("默认语言", selection: $model.defaultLanguage) {
-                    Text("自动检测").tag("")
-                    Text("中文").tag("zh")
-                    Text("英语").tag("en")
-                    Text("日语").tag("ja")
-                    Text("韩语").tag("ko")
-                    Text("法语").tag("fr")
-                    Text("德语").tag("de")
-                    Text("西班牙语").tag("es")
+            Section(l.recognitionSection) {
+                Picker(l.defaultLanguage, selection: $model.defaultLanguage) {
+                    Text(l.languageAuto).tag("")
+                    Text(l.languageChinese).tag("zh")
+                    Text(l.languageEnglish).tag("en")
+                    Text(l.languageJapanese).tag("ja")
+                    Text(l.languageKorean).tag("ko")
+                    Text(l.languageFrench).tag("fr")
+                    Text(l.languageGerman).tag("de")
+                    Text(l.languageSpanish).tag("es")
                 }
             }
 
-            Section("粘贴") {
-                Toggle("复制后清空剪贴板", isOn: $model.clearClipboardAfterCopy)
+            Section(l.pasteSection) {
+                Toggle(l.clearClipboardAfterCopy, isOn: $model.clearClipboardAfterCopy)
             }
 
             Section {
-                Toggle("启用热区", isOn: $model.hotzoneEnabled)
-                Picker("热区位置", selection: $model.hotzoneCorner) {
+                Toggle(l.hotzoneEnabled, isOn: $model.hotzoneEnabled)
+                Picker(l.hotzoneCorner, selection: $model.hotzoneCorner) {
                     ForEach(HotzoneCorner.allCases, id: \.self) { corner in
                         Text(cornerLabel(corner)).tag(corner)
                     }
                 }
                 Slider(value: $model.hotzoneHoldSeconds, in: 0.2...2.0, step: 0.1) {
-                    Text("触发停留秒数")
+                    Text(l.hotzoneHoldSeconds)
                 }
                 HStack {
-                    Text("停留秒数")
+                    Text(l.hotzoneHoldSeconds)
                     Spacer()
                     Text(String(format: "%.1f", model.hotzoneHoldSeconds))
                         .foregroundStyle(.secondary)
                 }
             } header: {
-                Text("热区触发")
+                Text(l.hotzoneSection)
             } footer: {
-                Text("将鼠标移动到屏幕角落并停留指定时间即可触发录音")
+                Text(l.hotzoneHint)
             }
 
             Section {
-                Toggle("启用 Force Touch", isOn: $model.forceTouchEnabled)
+                Toggle(l.forceTouchEnabled, isOn: $model.forceTouchEnabled)
                 Slider(value: $model.forceTouchHoldSeconds, in: 0.5...3.0, step: 0.1) {
-                    Text("触发停留秒数")
+                    Text(l.forceTouchHoldSeconds)
                 }
                 HStack {
-                    Text("停留秒数")
+                    Text(l.forceTouchHoldSeconds)
                     Spacer()
                     Text(String(format: "%.1f", model.forceTouchHoldSeconds))
                         .foregroundStyle(.secondary)
                 }
             } header: {
-                Text("Force Touch 触发")
+                Text(l.forceTouchSection)
             } footer: {
-                Text("在触控板上用力按压并保持指定时间即可触发录音，松开后开始转写")
+                Text(l.forceTouchHint)
             }
 
         }
         .formStyle(.grouped)
         .padding()
-        .alert("重置提示词？", isPresented: $showResetPromptAlert) {
-            Button("取消", role: .cancel) {}
-            Button("重置", role: .destructive) {
+        .alert(l.resetPromptTitle, isPresented: $showResetPromptAlert) {
+            Button(l.cancel, role: .cancel) {}
+            Button(l.reset, role: .destructive) {
                 model.resetRefinePrompt()
             }
         } message: {
-            Text("确定要将提示词重置为默认值吗？")
+            Text(l.resetPromptMessage)
         }
     }
 
     private func cornerLabel(_ corner: HotzoneCorner) -> String {
         switch corner {
         case .topLeft:
-            return "左上"
+            return l.cornerTopLeft
         case .topRight:
-            return "右上"
+            return l.cornerTopRight
         case .bottomLeft:
-            return "左下"
+            return l.cornerBottomLeft
         case .bottomRight:
-            return "右下"
+            return l.cornerBottomRight
         }
     }
 }
-

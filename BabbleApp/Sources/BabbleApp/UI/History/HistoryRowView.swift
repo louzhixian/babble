@@ -2,8 +2,16 @@ import AppKit
 import SwiftUI
 
 enum HistoryTextVariant: String, CaseIterable, Hashable {
-    case raw = "原文"
-    case refined = "润色"
+    case raw
+    case refined
+
+    func displayName(for language: AppLanguage) -> String {
+        let l = L10n.strings(for: language)
+        switch self {
+        case .raw: return l.rawText
+        case .refined: return l.refinedText
+        }
+    }
 }
 
 @MainActor
@@ -57,11 +65,17 @@ struct HistoryRowView: View {
     @StateObject private var model: HistoryRowViewModel
     private let clearClipboardAfterCopy: Bool
     @ObservedObject private var historyStore: HistoryStore
+    let settingsStore: SettingsStore
 
-    init(record: HistoryRecord, historyStore: HistoryStore, clearClipboardAfterCopy: Bool) {
+    private var l: LocalizedStrings {
+        L10n.strings(for: settingsStore.appLanguage)
+    }
+
+    init(record: HistoryRecord, historyStore: HistoryStore, settingsStore: SettingsStore, clearClipboardAfterCopy: Bool) {
         self.record = record
         _model = StateObject(wrappedValue: HistoryRowViewModel(record: record))
         _historyStore = ObservedObject(wrappedValue: historyStore)
+        self.settingsStore = settingsStore
         self.clearClipboardAfterCopy = clearClipboardAfterCopy
     }
 
@@ -70,14 +84,14 @@ struct HistoryRowView: View {
             HStack {
                 Picker("", selection: $model.selectedVariant) {
                     ForEach(HistoryTextVariant.allCases, id: \.self) { variant in
-                        Text(variant.rawValue).tag(variant)
+                        Text(variant.displayName(for: settingsStore.appLanguage)).tag(variant)
                     }
                 }
                 .pickerStyle(.segmented)
 
                 Spacer()
 
-                Button("编辑") {
+                Button(l.edit) {
                     model.beginEditing()
                 }
             }
@@ -92,7 +106,7 @@ struct HistoryRowView: View {
 
             HStack {
                 Spacer()
-                Button("复制") {
+                Button(l.copy) {
                     copyCurrentText()
                 }
             }

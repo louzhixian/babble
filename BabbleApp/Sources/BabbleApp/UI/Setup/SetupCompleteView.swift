@@ -17,6 +17,8 @@ struct SetupCompleteView: View {
     var warmupModel: () async throws -> Void
     var onComplete: () -> Void
 
+    private var l: LocalizedStrings { L10n.system }
+
     var body: some View {
         VStack(spacing: 24) {
             // Icon
@@ -64,15 +66,15 @@ struct SetupCompleteView: View {
     private var stateTitle: String {
         switch state {
         case .permissionsGranted:
-            return "Permissions Granted!"
+            return l.permissionsGranted
         case .startingService:
-            return "Starting Speech Service..."
+            return l.startingSpeechService
         case .loadingModel:
-            return "Loading Speech Model..."
+            return l.loadingSpeechModel
         case .serviceError:
-            return "Service Error"
+            return l.serviceError
         case .ready:
-            return "All Set!"
+            return l.allSet
         }
     }
 
@@ -98,17 +100,17 @@ struct SetupCompleteView: View {
 
     private var permissionsGrantedContent: some View {
         VStack(spacing: 16) {
-            Text("Microphone and Accessibility permissions are ready.")
+            Text(l.permissionsReadyMessage)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            Text("Click Continue to start the speech recognition service.")
+            Text(l.continueToStart)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            Button("Continue") {
+            Button(l.continueButton) {
                 startSetup()
             }
             .buttonStyle(.borderedProminent)
@@ -144,7 +146,7 @@ struct SetupCompleteView: View {
         VStack(spacing: 12) {
             ProgressView()
                 .controlSize(.regular)
-            Text("Initializing speech recognition service...")
+            Text(l.initializingService)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -156,10 +158,10 @@ struct SetupCompleteView: View {
         VStack(spacing: 12) {
             ProgressView()
                 .controlSize(.regular)
-            Text("Downloading and loading speech model...")
+            Text(l.downloadingModel)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text("This may take a few minutes on first launch (~1.5GB)")
+            Text(l.downloadingModelHint)
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
@@ -174,7 +176,7 @@ struct SetupCompleteView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            Button("Retry") {
+            Button(l.retry) {
                 startSetup()
             }
             .buttonStyle(.borderedProminent)
@@ -185,12 +187,12 @@ struct SetupCompleteView: View {
 
     private var readyContent: some View {
         VStack(spacing: 16) {
-            Text("Babble is ready to use!")
+            Text(l.babbleReady)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 10) {
-                Text("Ways to start voice input:")
+                Text(l.waysToStart)
                     .font(.caption)
                     .fontWeight(.medium)
 
@@ -198,7 +200,7 @@ struct SetupCompleteView: View {
                     Image(systemName: "keyboard")
                         .foregroundStyle(.blue)
                         .frame(width: 20)
-                    Text("Press Option + Space")
+                    Text(l.pressHotkey)
                         .font(.caption)
                 }
 
@@ -206,7 +208,7 @@ struct SetupCompleteView: View {
                     Image(systemName: "hand.tap.fill")
                         .foregroundStyle(.blue)
                         .frame(width: 20)
-                    Text("Force Touch the trackpad")
+                    Text(l.forceTouchTrackpad)
                         .font(.caption)
                 }
 
@@ -214,13 +216,18 @@ struct SetupCompleteView: View {
                     Image(systemName: "cursorarrow.click")
                         .foregroundStyle(.blue)
                         .frame(width: 20)
-                    Text("Move cursor to hot corner")
-                        .font(.caption)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(l.moveToHotCorner)
+                            .font(.caption)
+                        Text(l.enableInSettings)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
             }
             .padding(.vertical, 8)
 
-            Button("Start Using Babble") {
+            Button(l.startUsingBabble) {
                 onComplete()
             }
             .buttonStyle(.borderedProminent)

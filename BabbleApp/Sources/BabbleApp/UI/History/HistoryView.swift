@@ -10,6 +10,7 @@ struct HistoryView: View {
                 HistoryRowView(
                     record: record,
                     historyStore: store,
+                    settingsStore: settingsStore,
                     clearClipboardAfterCopy: settingsStore.clearClipboardAfterCopy
                 )
             }

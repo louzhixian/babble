@@ -8,6 +8,8 @@ struct DownloadView: View {
     @ObservedObject var downloadManager: DownloadManager
     var onComplete: () -> Void
 
+    private var l: LocalizedStrings { L10n.system }
+
     private let byteFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
         formatter.countStyle = .file
@@ -22,7 +24,7 @@ struct DownloadView: View {
                 .frame(height: 60)
 
             // Title
-            Text("Setting Up Babble")
+            Text(l.settingUpBabble)
                 .font(.title)
                 .fontWeight(.semibold)
 
@@ -88,7 +90,7 @@ struct DownloadView: View {
         VStack(spacing: 12) {
             ProgressView()
                 .controlSize(.regular)
-            Text("Checking for updates...")
+            Text(l.checkingForUpdates)
                 .foregroundStyle(.secondary)
         }
     }
@@ -101,7 +103,7 @@ struct DownloadView: View {
                 .progressViewStyle(.linear)
                 .frame(width: 280)
 
-            Text("Downloading speech engine...")
+            Text(l.downloadingSpeechEngine)
                 .foregroundStyle(.secondary)
 
             Text(formatDownloadProgress(downloadedBytes: downloadedBytes, totalBytes: totalBytes))
@@ -127,7 +129,7 @@ struct DownloadView: View {
         VStack(spacing: 12) {
             ProgressView()
                 .controlSize(.regular)
-            Text("Verifying download...")
+            Text(l.verifyingDownload)
                 .foregroundStyle(.secondary)
         }
     }
@@ -136,7 +138,7 @@ struct DownloadView: View {
 
     private func failedContent(error: DownloadError, retryCount: Int) -> some View {
         VStack(spacing: 16) {
-            Text("Download Failed")
+            Text(l.downloadFailed)
                 .font(.headline)
                 .foregroundStyle(.primary)
 
@@ -148,7 +150,7 @@ struct DownloadView: View {
 
             HStack(spacing: 16) {
                 if retryCount < downloadManager.maxRetries {
-                    Button("Retry") {
+                    Button(l.retry) {
                         Task {
                             await downloadManager.retry()
                         }
@@ -156,12 +158,12 @@ struct DownloadView: View {
                     .buttonStyle(.borderedProminent)
                 }
 
-                Button("Manual Download") {
+                Button(l.manualDownload) {
                     NSWorkspace.shared.open(downloadManager.manualDownloadURL)
                 }
                 .buttonStyle(.bordered)
 
-                Button("Check Again") {
+                Button(l.checkAgain) {
                     Task {
                         await downloadManager.downloadIfNeeded()
                     }
@@ -169,7 +171,7 @@ struct DownloadView: View {
                 .buttonStyle(.bordered)
             }
 
-            Text("Download both whisper-service and whisper-service.sha256,\nthen place them in ~/Library/Application Support/Babble/\nClick \"Check Again\" after placing the files.")
+            Text(l.manualDownloadHint)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -180,11 +182,11 @@ struct DownloadView: View {
 
     private var downloadCompleteContent: some View {
         VStack(spacing: 16) {
-            Text("Download Complete!")
+            Text(l.downloadComplete)
                 .font(.headline)
                 .foregroundStyle(.green)
 
-            Text("Next, Babble needs permissions to work properly:")
+            Text(l.permissionsNeeded)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -194,20 +196,20 @@ struct DownloadView: View {
                     Image(systemName: "mic.fill")
                         .foregroundStyle(.blue)
                         .frame(width: 20)
-                    Text("Microphone — for voice recording")
+                    Text(l.microphonePermission)
                         .font(.caption)
                 }
                 HStack(spacing: 8) {
                     Image(systemName: "hand.raised.fill")
                         .foregroundStyle(.blue)
                         .frame(width: 20)
-                    Text("Accessibility — for pasting text")
+                    Text(l.accessibilityPermission)
                         .font(.caption)
                 }
             }
             .padding(.vertical, 8)
 
-            Button("Continue") {
+            Button(l.continueButton) {
                 downloadManager.confirmDownloadComplete()
             }
             .buttonStyle(.borderedProminent)
@@ -217,7 +219,7 @@ struct DownloadView: View {
     // MARK: - Completed Content
 
     private var completedContent: some View {
-        Text("Ready!")
+        Text(l.ready)
             .font(.headline)
             .foregroundStyle(.green)
     }

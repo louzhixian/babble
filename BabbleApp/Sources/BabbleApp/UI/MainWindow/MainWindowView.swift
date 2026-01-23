@@ -7,7 +7,7 @@ enum MainWindowRoute: Hashable {
 
 @MainActor
 final class MainWindowRouter: ObservableObject {
-    @Published var selection: MainWindowRoute = .history
+    @Published var selection: MainWindowRoute = .settings
 }
 
 struct MainWindowView: View {
@@ -26,9 +26,8 @@ struct MainWindowView: View {
     }
 
     var body: some View {
-        // Test: All views together
         NavigationSplitView {
-            SidebarView(selection: $router.selection)
+            SidebarView(selection: $router.selection, settingsStore: settingsStore)
         } detail: {
             detailView
         }

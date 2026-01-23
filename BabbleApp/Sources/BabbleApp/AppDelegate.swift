@@ -177,12 +177,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func showPermissionAlert(for permission: String) {
+        let l = L10n.system
         let alert = NSAlert()
-        alert.messageText = "\(permission) Permission Required"
-        alert.informativeText = "Babble needs \(permission) permission to function. Please grant it in System Preferences."
+        alert.messageText = "\(permission) \(l.permissionRequired)"
+        alert.informativeText = String(format: l.permissionMessage, permission)
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Open System Preferences")
-        alert.addButton(withTitle: "Later")
+        alert.addButton(withTitle: l.openSystemPreferences)
+        alert.addButton(withTitle: l.later)
 
         if alert.runModal() == .alertFirstButtonReturn {
             if permission == "Microphone" {

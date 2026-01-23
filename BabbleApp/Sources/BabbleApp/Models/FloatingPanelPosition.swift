@@ -5,18 +5,19 @@ enum FloatingPanelPosition: String, CaseIterable, Sendable {
     case right
     case center
 
-    var displayName: String {
+    func displayName(for language: AppLanguage) -> String {
+        let l = L10n.strings(for: language)
         switch self {
-        case .top:
-            return "上"
-        case .bottom:
-            return "下"
-        case .left:
-            return "左"
-        case .right:
-            return "右"
-        case .center:
-            return "中"
+        case .top: return l.positionTop
+        case .bottom: return l.positionBottom
+        case .left: return l.positionLeft
+        case .right: return l.positionRight
+        case .center: return l.positionCenter
         }
+    }
+
+    /// Legacy display name for menu (uses system language)
+    var displayName: String {
+        displayName(for: .system)
     }
 }

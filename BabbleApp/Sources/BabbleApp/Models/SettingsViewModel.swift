@@ -46,6 +46,10 @@ final class SettingsViewModel: ObservableObject {
         didSet { store.hotkeyConfig = hotkeyConfig }
     }
 
+    @Published var appLanguage: AppLanguage {
+        didSet { store.appLanguage = appLanguage }
+    }
+
     private let store: SettingsStore
 
     init(store: SettingsStore) {
@@ -61,6 +65,7 @@ final class SettingsViewModel: ObservableObject {
         forceTouchEnabled = store.forceTouchEnabled
         forceTouchHoldSeconds = store.forceTouchHoldSeconds
         hotkeyConfig = store.hotkeyConfig
+        appLanguage = store.appLanguage
     }
 
     func resetRefinePrompt() {

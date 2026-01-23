@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Build Release
+        working-directory: BabbleApp
+        run: |
+          swift build -c release
+
+      - name: Create App Bundle
+        working-directory: BabbleApp
+        run: |
+          APP_DIR=".build/Babble.app"
+          CONTENTS_DIR="$APP_DIR/Contents"
+          MACOS_DIR="$CONTENTS_DIR/MacOS"
+          RESOURCES_DIR="$CONTENTS_DIR/Resources"
+
+          rm -rf "$APP_DIR"
+          mkdir -p "$MACOS_DIR"
+          mkdir -p "$RESOURCES_DIR"
+
+          cp .build/release/Babble "$MACOS_DIR/"
+          cp Info.plist "$CONTENTS_DIR/"
+
+          # Create zip for release
+          cd .build
+          zip -r Babble-${{ github.ref_name }}.zip Babble.app
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: BabbleApp/.build/Babble-${{ github.ref_name }}.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
