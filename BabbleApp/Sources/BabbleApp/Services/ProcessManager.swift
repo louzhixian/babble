@@ -149,26 +149,37 @@ actor WhisperProcessManager {
     /// Preload the model (downloads if not cached, loads into memory)
     /// Call this after start() to ensure model is ready before first use
     func warmup() async throws {
+        print("ProcessManager: warmup() called, ensuring service is running...")
         try await ensureRunning()
+        print("ProcessManager: service is running, calling warmup endpoint...")
+
+        // Use a dedicated session with long timeout for model download
+        let warmupConfig = URLSessionConfiguration.default
+        warmupConfig.timeoutIntervalForRequest = 600  // 10 minutes
+        warmupConfig.timeoutIntervalForResource = 600
+        let warmupSession = URLSession(configuration: warmupConfig)
+        defer { warmupSession.invalidateAndCancel() }
 
         let warmupURL = URL(string: "http://\(host):\(port)/warmup")!
         var request = URLRequest(url: warmupURL)
         request.httpMethod = "POST"
-        request.timeoutInterval = 600  // 10 minutes for model download
 
-        print("ProcessManager: calling warmup endpoint")
+        print("ProcessManager: POST \(warmupURL)")
 
         do {
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await warmupSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
+                print("ProcessManager: warmup - not an HTTP response")
                 throw ProcessManagerError.startFailed("Warmup: not an HTTP response")
             }
 
             print("ProcessManager: warmup response status: \(httpResponse.statusCode)")
 
+            let bodyStr = String(data: data, encoding: .utf8) ?? "no body"
+            print("ProcessManager: warmup response body: \(bodyStr)")
+
             guard httpResponse.statusCode == 200 else {
-                let bodyStr = String(data: data, encoding: .utf8) ?? "no body"
                 throw ProcessManagerError.startFailed("Warmup failed with HTTP \(httpResponse.statusCode): \(bodyStr)")
             }
 
@@ -181,9 +192,15 @@ actor WhisperProcessManager {
                 }
             }
 
-            throw ProcessManagerError.startFailed("Unexpected warmup response")
+            throw ProcessManagerError.startFailed("Unexpected warmup response: \(bodyStr)")
         } catch let error as ProcessManagerError {
             throw error
+        } catch let urlError as URLError {
+            print("ProcessManager: warmup URLError: \(urlError.code.rawValue) - \(urlError.localizedDescription)")
+            if urlError.code == .timedOut {
+                throw ProcessManagerError.startFailed("Warmup timed out - model download may still be in progress")
+            }
+            throw ProcessManagerError.startFailed("Warmup request failed: \(urlError.localizedDescription)")
         } catch {
             print("ProcessManager: warmup error: \(error)")
             throw ProcessManagerError.startFailed("Warmup request failed: \(error.localizedDescription)")

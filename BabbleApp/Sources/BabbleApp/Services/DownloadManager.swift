@@ -64,7 +64,7 @@ final class DownloadManager: ObservableObject {
 
     private let owner = "louzhixian"
     private let repo = "babble"
-    private let version = "whisper-v1.0.6"
+    private let version = "whisper-v1.0.7"
     private let binaryName = "whisper-service"
     private let checksumFileName = "whisper-service.sha256"
 
@@ -439,35 +439,77 @@ final class DownloadManager: ObservableObject {
         }
     }
 
-    /// Get file size via HEAD request, following redirects manually
-    /// URLSession's default HEAD handling doesn't always return Content-Length after redirects
+    /// Get file size by resolving redirect chain and making HEAD request to final URL
+    /// GitHub releases redirect to a CDN URL that has the Content-Length header
     private func getFileSizeViaHead(url: URL) async -> Int64 {
-        // Use a custom delegate to follow redirects and capture final response
-        let delegate = HeadRequestDelegate()
-        let headSession = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
-        defer { headSession.invalidateAndCancel() }
+        print("DownloadManager: Getting file size for \(url)")
+
+        // Step 1: Resolve the redirect chain to get the final URL
+        // Use a custom delegate that collects the final URL after all redirects
+        let redirectResolver = RedirectResolver()
+        let resolverConfig = URLSessionConfiguration.default
+        resolverConfig.timeoutIntervalForRequest = 30
+        let resolverSession = URLSession(configuration: resolverConfig, delegate: redirectResolver, delegateQueue: nil)
+        defer { resolverSession.invalidateAndCancel() }
 
         var request = URLRequest(url: url)
         request.httpMethod = "HEAD"
 
         do {
-            let (_, response) = try await headSession.data(for: request)
+            // This will follow redirects automatically via the delegate
+            let (_, response) = try await resolverSession.data(for: request)
             if let httpResponse = response as? HTTPURLResponse {
                 let size = httpResponse.expectedContentLength
-                print("DownloadManager: HEAD request returned size: \(size) bytes")
-                return size
+                let finalURL = redirectResolver.finalURL ?? url
+                print("DownloadManager: Resolved to \(finalURL), Content-Length: \(size)")
+                if size > 0 {
+                    return size
+                }
             }
         } catch {
             print("DownloadManager: HEAD request failed: \(error)")
         }
+
+        // Step 2: Fallback - try a range request to get Content-Range header
+        // This works even when Content-Length is not provided
+        print("DownloadManager: Trying range request fallback")
+        var rangeRequest = URLRequest(url: url)
+        rangeRequest.httpMethod = "GET"
+        rangeRequest.setValue("bytes=0-0", forHTTPHeaderField: "Range")
+
+        do {
+            let (_, response) = try await session.data(for: rangeRequest)
+            if let httpResponse = response as? HTTPURLResponse,
+               let contentRange = httpResponse.value(forHTTPHeaderField: "Content-Range") {
+                // Format: "bytes 0-0/12345678"
+                if let slashIndex = contentRange.lastIndex(of: "/"),
+                   let size = Int64(contentRange[contentRange.index(after: slashIndex)...]) {
+                    print("DownloadManager: Range request returned size: \(size)")
+                    return size
+                }
+            }
+        } catch {
+            print("DownloadManager: Range request failed: \(error)")
+        }
+
+        print("DownloadManager: Could not determine file size")
         return -1
     }
 }
 
-// MARK: - Head Request Delegate
+// MARK: - Redirect Resolver Delegate
 
-/// Delegate that follows redirects for HEAD requests
-private final class HeadRequestDelegate: NSObject, URLSessionTaskDelegate {
+/// Delegate that follows redirects and captures the final URL
+private final class RedirectResolver: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _finalURL: URL?
+
+    var finalURL: URL? {
+        lock.lock()
+        defer { lock.unlock() }
+        return _finalURL
+    }
+
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
@@ -475,8 +517,12 @@ private final class HeadRequestDelegate: NSObject, URLSessionTaskDelegate {
         newRequest request: URLRequest,
         completionHandler: @escaping (URLRequest?) -> Void
     ) {
-        // Follow the redirect but keep it as HEAD
-        print("HeadRequestDelegate: Redirecting to \(request.url?.absoluteString ?? "nil")")
+        // Capture the redirect URL
+        lock.lock()
+        _finalURL = request.url
+        lock.unlock()
+        print("RedirectResolver: Following redirect to \(request.url?.absoluteString ?? "nil")")
+        // Follow the redirect, keeping it as HEAD
         var newRequest = request
         newRequest.httpMethod = "HEAD"
         completionHandler(newRequest)
