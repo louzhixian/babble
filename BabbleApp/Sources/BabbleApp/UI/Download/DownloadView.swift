@@ -51,7 +51,7 @@ struct DownloadView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
 
-        case .completed:
+        case .downloadComplete, .completed:
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
         }
@@ -73,6 +73,9 @@ struct DownloadView: View {
 
         case .failed(let error, let retryCount):
             failedContent(error: error, retryCount: retryCount)
+
+        case .downloadComplete:
+            downloadCompleteContent
 
         case .completed:
             completedContent
@@ -170,6 +173,44 @@ struct DownloadView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+        }
+    }
+
+    // MARK: - Download Complete Content (waiting for user confirmation)
+
+    private var downloadCompleteContent: some View {
+        VStack(spacing: 16) {
+            Text("Download Complete!")
+                .font(.headline)
+                .foregroundStyle(.green)
+
+            Text("Next, Babble needs permissions to work properly:")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "mic.fill")
+                        .foregroundStyle(.blue)
+                        .frame(width: 20)
+                    Text("Microphone — for voice recording")
+                        .font(.caption)
+                }
+                HStack(spacing: 8) {
+                    Image(systemName: "hand.raised.fill")
+                        .foregroundStyle(.blue)
+                        .frame(width: 20)
+                    Text("Accessibility — for pasting text")
+                        .font(.caption)
+                }
+            }
+            .padding(.vertical, 8)
+
+            Button("Continue") {
+                downloadManager.confirmDownloadComplete()
+            }
+            .buttonStyle(.borderedProminent)
         }
     }
 

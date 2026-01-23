@@ -10,7 +10,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var floatingPanel: FloatingPanelWindow?
     private var mainWindow: NSWindow?
     private var downloadWindow: NSWindow?
+    private var setupWindow: NSWindow?
     let coordinator = AppCoordinator()
+
+    /// Key to track if this launch is after accessibility permission was granted
+    private static let postAccessibilityRestartKey = "BabblePostAccessibilityRestart"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Ensure app shows in Dock (Info.plist LSUIElement is ignored by swift run)
@@ -37,6 +41,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func proceedWithNormalStartup() {
         setupMenuBar()
         setupFloatingPanel()
+
+        // Check if this is a restart after accessibility permission was granted
+        let isPostAccessibilityRestart = UserDefaults.standard.bool(forKey: Self.postAccessibilityRestartKey)
+        if isPostAccessibilityRestart {
+            UserDefaults.standard.removeObject(forKey: Self.postAccessibilityRestartKey)
+
+            // Verify permissions are actually granted
+            if AXIsProcessTrusted() {
+                showSetupCompleteWindow()
+                return
+            }
+        }
+
         checkPermissions()
         coordinator.voiceInputController.start()
     }
@@ -140,6 +157,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func restartApp() {
+        // Mark that next launch is after accessibility permission granted
+        UserDefaults.standard.set(true, forKey: Self.postAccessibilityRestartKey)
+
         let bundlePath = Bundle.main.bundlePath
         // Use NSWorkspace to open the app, which is more reliable
         let config = NSWorkspace.OpenConfiguration()
@@ -228,6 +248,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if let window = notification.object as? NSWindow, window === mainWindow {
             window.level = .normal
         }
+    }
+
+    private func showSetupCompleteWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+
+        let setupView = SetupCompleteView { [weak self] in
+            self?.setupWindow?.close()
+            self?.setupWindow = nil
+            self?.coordinator.voiceInputController.start()
+        }
+
+        let hostingController = NSHostingController(rootView: setupView)
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 320),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Setup Complete"
+        window.contentViewController = hostingController
+        window.isReleasedWhenClosed = false
+        window.center()
+        setupWindow = window
+
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
     }
 
     @objc private func quit() {

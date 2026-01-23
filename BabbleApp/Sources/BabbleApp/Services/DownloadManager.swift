@@ -11,13 +11,15 @@ enum DownloadState: Equatable {
     case downloading(progress: Double, downloadedBytes: Int64, totalBytes: Int64)
     case verifying
     case failed(error: DownloadError, retryCount: Int)
-    case completed
+    case downloadComplete  // Download finished, waiting for user confirmation
+    case completed  // User confirmed, ready to proceed
 
     static func == (lhs: DownloadState, rhs: DownloadState) -> Bool {
         switch (lhs, rhs) {
         case (.idle, .idle),
              (.checking, .checking),
              (.verifying, .verifying),
+             (.downloadComplete, .downloadComplete),
              (.completed, .completed):
             return true
         case let (.downloading(lp, ld, lt), .downloading(rp, rd, rt)):
@@ -239,6 +241,12 @@ final class DownloadManager: ObservableObject {
         URL(string: "https://github.com/\(owner)/\(repo)/releases/tag/\(version)")!
     }
 
+    /// Called when user confirms download completion to proceed with permissions
+    func confirmDownloadComplete() {
+        guard case .downloadComplete = state else { return }
+        state = .completed
+    }
+
     // MARK: - Private Methods
 
     private func performDownload() async {
@@ -267,7 +275,7 @@ final class DownloadManager: ObservableObject {
             // Make binary executable
             try makeExecutable()
 
-            state = .completed
+            state = .downloadComplete
 
         } catch let error as DownloadError {
             state = .failed(error: error, retryCount: currentRetryCount)
@@ -334,10 +342,15 @@ final class DownloadManager: ObservableObject {
             }
         }
 
+        // Use a dedicated OperationQueue to ensure delegate callbacks are delivered
+        let delegateQueue = OperationQueue()
+        delegateQueue.name = "DownloadProgress"
+        delegateQueue.maxConcurrentOperationCount = 1
+
         let delegateSession = URLSession(
             configuration: session.configuration,
             delegate: delegate,
-            delegateQueue: nil
+            delegateQueue: delegateQueue
         )
 
         defer {
@@ -424,8 +437,10 @@ final class DownloadManager: ObservableObject {
 // MARK: - Download Progress Delegate
 
 /// Delegate for tracking download progress with URLSessionDownloadTask
-private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
+private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     private let onProgress: @Sendable (Double, Int64, Int64) -> Void
+    private let lock = NSLock()
+    private var _lastUpdateTime: Date = .distantPast
 
     init(onProgress: @escaping @Sendable (Double, Int64, Int64) -> Void) {
         self.onProgress = onProgress
@@ -439,6 +454,17 @@ private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelega
         totalBytesWritten: Int64,
         totalBytesExpectedToWrite: Int64
     ) {
+        // Throttle updates to avoid overwhelming the main thread
+        let now = Date()
+        lock.lock()
+        let shouldUpdate = now.timeIntervalSince(_lastUpdateTime) >= 0.1
+        if shouldUpdate {
+            _lastUpdateTime = now
+        }
+        lock.unlock()
+
+        guard shouldUpdate else { return }
+
         let progress = totalBytesExpectedToWrite > 0
             ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
             : 0
