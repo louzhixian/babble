@@ -106,6 +106,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         )
     }
 
+    private var accessibilityTimer: Timer?
+
     private func checkPermissions() {
         // Check microphone permission
         AVCaptureDevice.requestAccess(for: .audio) { granted in
@@ -117,10 +119,34 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
 
         // Check accessibility permission once at startup
-        // This triggers the system prompt if not already granted
+        // If not granted, prompt and poll for when user grants it
         if !AXIsProcessTrusted() {
             let options: [String: Any] = ["AXTrustedCheckOptionPrompt": true]
             AXIsProcessTrustedWithOptions(options as CFDictionary)
+            startAccessibilityPolling()
+        }
+    }
+
+    private func startAccessibilityPolling() {
+        accessibilityTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
+            if AXIsProcessTrusted() {
+                timer.invalidate()
+                Task { @MainActor in
+                    self?.accessibilityTimer = nil
+                    self?.restartApp()
+                }
+            }
+        }
+    }
+
+    private func restartApp() {
+        let bundlePath = Bundle.main.bundlePath
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        task.arguments = [bundlePath]
+        try? task.run()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            NSApplication.shared.terminate(nil)
         }
     }
 
