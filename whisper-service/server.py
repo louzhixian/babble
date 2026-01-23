@@ -1,8 +1,14 @@
 """FastAPI server for Whisper transcription service."""
 
 import os
+import sys
 import tempfile
 from pathlib import Path
+
+# Add bundled binaries (e.g., ffmpeg) to PATH when running from PyInstaller bundle
+if getattr(sys, 'frozen', False):
+    bundle_dir = sys._MEIPASS
+    os.environ['PATH'] = bundle_dir + os.pathsep + os.environ.get('PATH', '')
 
 import yaml
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
