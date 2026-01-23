@@ -46,12 +46,8 @@ final class ForceTouchTrigger {
         stop()
         ForceTouchTrigger.sharedInstance = self
 
-        // Check Accessibility permission
-        let trusted = AXIsProcessTrusted()
-        if !trusted {
-            // Prompt user to grant permission
-            let options: [String: Any] = ["AXTrustedCheckOptionPrompt": true]
-            AXIsProcessTrustedWithOptions(options as CFDictionary)
+        // Check Accessibility permission (don't prompt here - AppDelegate handles that)
+        guard AXIsProcessTrusted() else {
             return
         }
 

@@ -116,9 +116,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
         }
 
-        // Note: Accessibility permission is checked by ForceTouchTrigger.start()
-        // and PasteService when actually needed. We don't prompt here to avoid
-        // duplicate system dialogs.
+        // Check accessibility permission once at startup
+        // This triggers the system prompt if not already granted
+        if !AXIsProcessTrusted() {
+            let options: [String: Any] = ["AXTrustedCheckOptionPrompt": true]
+            AXIsProcessTrustedWithOptions(options as CFDictionary)
+        }
     }
 
     private func showPermissionAlert(for permission: String) {
