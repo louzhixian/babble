@@ -334,13 +334,20 @@ final class DownloadManager: ObservableObject {
 
         state = .downloading(progress: 0, downloadedBytes: 0, totalBytes: 0)
 
+        // First, get the actual file size via HEAD request (following redirects)
+        // GitHub releases redirect to a CDN, and the original URL doesn't have Content-Length
+        var headRequest = URLRequest(url: url)
+        headRequest.httpMethod = "HEAD"
+        let (_, headResponse) = try await session.data(for: headRequest)
+        let expectedSize = (headResponse as? HTTPURLResponse)?.expectedContentLength ?? -1
+
         // Use URLSessionDownloadTask for efficient large file downloads
         // This avoids per-byte iteration overhead
-        let delegate = DownloadProgressDelegate { [weak self] progress, downloaded, total in
+        let delegate = DownloadProgressDelegate(expectedSize: expectedSize, onProgress: { [weak self] progress, downloaded, total in
             Task { @MainActor in
                 self?.state = .downloading(progress: progress, downloadedBytes: downloaded, totalBytes: total)
             }
-        }
+        })
 
         // Use a dedicated OperationQueue to ensure delegate callbacks are delivered
         let delegateQueue = OperationQueue()
@@ -373,8 +380,8 @@ final class DownloadManager: ObservableObject {
         try? fm.removeItem(at: destinationPath)
         try fm.moveItem(at: tempURL, to: destinationPath)
 
-        // Final progress update
-        let totalBytes = httpResponse.expectedContentLength
+        // Final progress update - use actual file size if HEAD request succeeded
+        let totalBytes = expectedSize > 0 ? expectedSize : httpResponse.expectedContentLength
         state = .downloading(progress: 1.0, downloadedBytes: totalBytes, totalBytes: totalBytes)
     }
 
@@ -441,8 +448,10 @@ private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelega
     private let onProgress: @Sendable (Double, Int64, Int64) -> Void
     private let lock = NSLock()
     private var _lastUpdateTime: Date = .distantPast
+    private let expectedSize: Int64  // From HEAD request, used when server doesn't provide Content-Length
 
-    init(onProgress: @escaping @Sendable (Double, Int64, Int64) -> Void) {
+    init(expectedSize: Int64 = -1, onProgress: @escaping @Sendable (Double, Int64, Int64) -> Void) {
+        self.expectedSize = expectedSize
         self.onProgress = onProgress
         super.init()
     }
@@ -465,10 +474,12 @@ private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelega
 
         guard shouldUpdate else { return }
 
-        let progress = totalBytesExpectedToWrite > 0
-            ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+        // Use expectedSize from HEAD request if server doesn't provide Content-Length
+        let totalBytes = totalBytesExpectedToWrite > 0 ? totalBytesExpectedToWrite : expectedSize
+        let progress = totalBytes > 0
+            ? Double(totalBytesWritten) / Double(totalBytes)
             : 0
-        onProgress(progress, totalBytesWritten, totalBytesExpectedToWrite)
+        onProgress(progress, totalBytesWritten, totalBytes)
     }
 
     func urlSession(

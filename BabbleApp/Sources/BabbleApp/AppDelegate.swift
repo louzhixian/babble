@@ -253,16 +253,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func showSetupCompleteWindow() {
         NSApp.activate(ignoringOtherApps: true)
 
-        let setupView = SetupCompleteView { [weak self] in
-            self?.setupWindow?.close()
-            self?.setupWindow = nil
-            self?.coordinator.voiceInputController.start()
-        }
+        let setupView = SetupCompleteView(
+            startService: { [weak self] in
+                // Start the voice input controller which initializes whisper-service
+                guard let self else { return }
+                self.coordinator.voiceInputController.start()
+            },
+            onComplete: { [weak self] in
+                self?.setupWindow?.close()
+                self?.setupWindow = nil
+            }
+        )
 
         let hostingController = NSHostingController(rootView: setupView)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 320),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 340),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false

@@ -2,15 +2,17 @@
 
 import SwiftUI
 
-/// View shown after permissions are granted, guides user through model loading
+/// View shown after permissions are granted, guides user through service initialization
 struct SetupCompleteView: View {
     enum SetupState {
         case permissionsGranted
-        case loadingModel
+        case startingService
+        case serviceError(String)
         case ready
     }
 
     @State private var state: SetupState = .permissionsGranted
+    var startService: () async throws -> Void
     var onComplete: () -> Void
 
     var body: some View {
@@ -29,7 +31,7 @@ struct SetupCompleteView: View {
             stateContent
         }
         .padding(32)
-        .frame(width: 420, height: 320)
+        .frame(width: 420, height: 340)
     }
 
     // MARK: - State Icon
@@ -40,9 +42,12 @@ struct SetupCompleteView: View {
         case .permissionsGranted:
             Image(systemName: "checkmark.shield.fill")
                 .foregroundStyle(.green)
-        case .loadingModel:
+        case .startingService:
             Image(systemName: "cpu.fill")
                 .foregroundStyle(.blue)
+        case .serviceError:
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
         case .ready:
             Image(systemName: "hand.thumbsup.fill")
                 .foregroundStyle(.green)
@@ -55,8 +60,10 @@ struct SetupCompleteView: View {
         switch state {
         case .permissionsGranted:
             return "Permissions Granted!"
-        case .loadingModel:
-            return "Loading Speech Model..."
+        case .startingService:
+            return "Starting Speech Service..."
+        case .serviceError:
+            return "Service Error"
         case .ready:
             return "All Set!"
         }
@@ -69,8 +76,10 @@ struct SetupCompleteView: View {
         switch state {
         case .permissionsGranted:
             permissionsGrantedContent
-        case .loadingModel:
-            loadingModelContent
+        case .startingService:
+            startingServiceContent
+        case .serviceError(let message):
+            serviceErrorContent(message: message)
         case .ready:
             readyContent
         }
@@ -85,19 +94,23 @@ struct SetupCompleteView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            Text("Next, we'll load the speech recognition model.\nThis may take a moment on first launch.")
+            Text("Click Continue to start the speech recognition service.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            Button("Load Model") {
-                state = .loadingModel
-                // Simulate model loading (in real app, this would load the actual model)
+            Button("Continue") {
+                state = .startingService
                 Task {
-                    // Give time to show loading state
-                    try? await Task.sleep(for: .milliseconds(500))
-                    await MainActor.run {
-                        state = .ready
+                    do {
+                        try await startService()
+                        await MainActor.run {
+                            state = .ready
+                        }
+                    } catch {
+                        await MainActor.run {
+                            state = .serviceError(error.localizedDescription)
+                        }
                     }
                 }
             }
@@ -105,15 +118,43 @@ struct SetupCompleteView: View {
         }
     }
 
-    // MARK: - Loading Model Content
+    // MARK: - Starting Service Content
 
-    private var loadingModelContent: some View {
+    private var startingServiceContent: some View {
         VStack(spacing: 12) {
             ProgressView()
                 .controlSize(.regular)
-            Text("Initializing speech recognition...")
+            Text("Initializing speech recognition service...")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Service Error Content
+
+    private func serviceErrorContent(message: String) -> some View {
+        VStack(spacing: 16) {
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            Button("Retry") {
+                state = .startingService
+                Task {
+                    do {
+                        try await startService()
+                        await MainActor.run {
+                            state = .ready
+                        }
+                    } catch {
+                        await MainActor.run {
+                            state = .serviceError(error.localizedDescription)
+                        }
+                    }
+                }
+            }
+            .buttonStyle(.borderedProminent)
         }
     }
 
@@ -155,6 +196,11 @@ struct SetupCompleteView: View {
                 }
             }
             .padding(.vertical, 8)
+
+            Text("The speech model (~1.5GB) will download automatically on first use.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
 
             Button("Start Using Babble") {
                 onComplete()
