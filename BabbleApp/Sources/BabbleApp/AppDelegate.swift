@@ -141,12 +141,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func restartApp() {
         let bundlePath = Bundle.main.bundlePath
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        task.arguments = [bundlePath]
-        try? task.run()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            NSApplication.shared.terminate(nil)
+        // Use NSWorkspace to open the app, which is more reliable
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+
+        NSWorkspace.shared.openApplication(
+            at: URL(fileURLWithPath: bundlePath),
+            configuration: config
+        ) { _, _ in
+            // Terminate after new instance has started
+            DispatchQueue.main.async {
+                NSApplication.shared.terminate(nil)
+            }
         }
     }
 
