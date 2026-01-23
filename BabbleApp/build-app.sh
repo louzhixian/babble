@@ -32,10 +32,10 @@ cp Info.plist "$CONTENTS_DIR/"
 # Copy app icon
 cp Resources/AppIcon.icns "$RESOURCES_DIR/"
 
-# Ad-hoc sign with hardened runtime and explicit identifier
+# Ad-hoc sign with hardened runtime, explicit identifier, and entitlements
 # The --identifier flag ensures the bundle identifier from Info.plist is used
-# Without it, codesign may use the binary name, causing TCC permission issues
-codesign --force --deep --options runtime --identifier "com.babble.app" --sign - "$APP_DIR"
+# The --entitlements flag enables audio-input capability for microphone access with hardened runtime
+codesign --force --deep --options runtime --identifier "com.babble.app" --entitlements Babble.entitlements --sign - "$APP_DIR"
 
 echo ""
 echo "Built Babble.app at $APP_DIR"

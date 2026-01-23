@@ -42,8 +42,8 @@ jobs:
           cp Info.plist "$CONTENTS_DIR/"
           cp Resources/AppIcon.icns "$RESOURCES_DIR/"
 
-          # Ad-hoc sign with hardened runtime and explicit identifier
-          codesign --force --deep --options runtime --identifier "com.babble.app" --sign - "$APP_DIR"
+          # Ad-hoc sign with hardened runtime, explicit identifier, and entitlements
+          codesign --force --deep --options runtime --identifier "com.babble.app" --entitlements Babble.entitlements --sign - "$APP_DIR"
 
           # Remove quarantine attribute and create zip
           cd .build
